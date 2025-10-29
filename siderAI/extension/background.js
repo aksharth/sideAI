@@ -1,0 +1,211 @@
+chrome.runtime.onInstalled.addListener(() => {
+  console.log('SiderAI extension installed');
+});
+
+// Clicking the toolbar icon toggles the right-side chat panel
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab || !tab.id) return;
+  
+  try {
+    // Try to get current state
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'GET_PANEL_STATE' });
+    } catch (e) {
+      // Content script might not be ready, that's okay
+    }
+    
+    // Toggle panel
+    chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' }, (response) => {
+      if (chrome.runtime.lastError) {
+        // Content script not ready - inject it
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }).then(() => {
+          // Try again after injection
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' });
+          }, 100);
+        }).catch(err => {
+          console.log('Could not inject content script:', err);
+        });
+      }
+    });
+  } catch (error) {
+    console.log('Error toggling panel:', error);
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'CHAT_REQUEST') {
+    handleChatRequest(request, sendResponse);
+    return true; // Indicates we will send a response asynchronously
+  } else if (request.type === 'CAPTURE_SCREENSHOT') {
+    captureScreenshot(request.bounds, sender.tab?.id, sendResponse);
+    return true; // Indicates we will send a response asynchronously
+  }
+  return false;
+});
+
+async function captureScreenshot(bounds, tabId, sendResponse) {
+  try {
+    // Note: Full screenshot capture requires additional permissions
+    // For now, we'll use a canvas-based approach from content script
+    // In a real implementation, you'd use chrome.tabs.captureVisibleTab
+    if (sendResponse) {
+      sendResponse({ 
+        success: true, 
+        message: 'Screenshot area selected. Note: Full capture requires additional setup.' 
+      });
+    }
+    return true;
+  } catch (error) {
+    if (sendResponse) {
+      sendResponse({ error: error.message });
+    }
+    return false;
+  }
+}
+
+async function handleChatRequest(request, sendResponse) {
+  const { message, model } = request;
+  
+  try {
+    const response = await callAIModel(model, message);
+    sendResponse({ text: response });
+  } catch (error) {
+    console.error('Chat error:', error);
+    sendResponse({ error: error.message });
+  }
+}
+
+async function callAIModel(model, message) {
+  const apiKeys = await getAPIKeys();
+  
+  switch (model) {
+    case 'chatgpt':
+    case 'gpt4':
+      return await callChatGPT(message, apiKeys.openai, model === 'gpt4');
+    case 'gemini':
+      return await callGemini(message, apiKeys.gemini);
+    case 'claude':
+      return await callClaude(message, apiKeys.claude);
+    default:
+      throw new Error(`Unsupported model: ${model}`);
+  }
+}
+
+async function getAPIKeys() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['openai_key', 'gemini_key', 'claude_key'], (result) => {
+      resolve({
+        openai: result.openai_key || '',
+        gemini: result.gemini_key || '',
+        claude: result.claude_key || ''
+      });
+    });
+  });
+}
+
+async function callChatGPT(message, apiKey, isGPT4 = false) {
+  if (!apiKey) {
+    return 'Please set your OpenAI API key in the extension settings. You can get one from https://platform.openai.com/api-keys';
+  }
+  
+  const model = isGPT4 ? 'gpt-4' : 'gpt-3.5-turbo';
+  
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: [
+          { role: 'user', content: message }
+        ],
+        max_tokens: 1000
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'OpenAI API error');
+    }
+    
+    const data = await response.json();
+    return data.choices[0]?.message?.content || 'No response';
+  } catch (error) {
+    throw new Error(`OpenAI API Error: ${error.message}`);
+  }
+}
+
+async function callGemini(message, apiKey) {
+  if (!apiKey) {
+    return 'Please set your Gemini API key in the extension settings. You can get one from https://makersuite.google.com/app/apikey';
+  }
+  
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: message
+          }]
+        }]
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Gemini API error');
+    }
+    
+    const data = await response.json();
+    return data.candidates[0]?.content?.parts[0]?.text || 'No response';
+  } catch (error) {
+    throw new Error(`Gemini API Error: ${error.message}`);
+  }
+}
+
+async function callClaude(message, apiKey) {
+  if (!apiKey) {
+    return 'Please set your Claude API key in the extension settings. You can get one from https://console.anthropic.com/';
+  }
+  
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-sonnet-20240229',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: message
+        }]
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Claude API error');
+    }
+    
+    const data = await response.json();
+    return data.content[0]?.text || 'No response';
+  } catch (error) {
+    throw new Error(`Claude API Error: ${error.message}`);
+  }
+}
+

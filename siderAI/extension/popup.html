@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SiderAI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ffffff;
+    }
+    
+    .header {
+      margin-bottom: 16px;
+    }
+    
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 4px;
+    }
+    
+    .header p {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+    
+    .btn-primary {
+      background: #3b82f6;
+      color: #ffffff;
+    }
+    
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+    
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    
+    .settings-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    
+    .settings-section h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+    
+    .setting-item {
+      margin-bottom: 12px;
+    }
+    
+    .setting-item label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    
+    .setting-item input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    
+    .setting-item input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .info-text {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+    
+    .status {
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      margin-top: 12px;
+      text-align: center;
+    }
+    
+    .status-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SiderAI Chat</h1>
+    <p>Chat with multiple AI models</p>
+  </div>
+  
+  <button class="btn btn-primary" id="openChatBtn">
+    Open Chat Panel
+  </button>
+  
+  <button class="btn btn-secondary" id="settingsBtn">
+    Settings
+  </button>
+  
+  <div class="settings-section" id="settingsSection" style="display: none;">
+    <h2>API Keys</h2>
+    
+    <div class="setting-item">
+      <label for="openaiKey">OpenAI API Key</label>
+      <input type="password" id="openaiKey" placeholder="sk-...">
+      <p class="info-text">Get your key from platform.openai.com</p>
+    </div>
+    
+    <div class="setting-item">
+      <label for="geminiKey">Gemini API Key</label>
+      <input type="password" id="geminiKey" placeholder="AI...">
+      <p class="info-text">Get your key from makersuite.google.com</p>
+    </div>
+    
+    <div class="setting-item">
+      <label for="claudeKey">Claude API Key</label>
+      <input type="password" id="claudeKey" placeholder="sk-ant-...">
+      <p class="info-text">Get your key from console.anthropic.com</p>
+    </div>
+    
+    <button class="btn btn-primary" id="saveKeysBtn">
+      Save API Keys
+    </button>
+    
+    <div class="status status-success" id="saveStatus" style="display: none;">
+      API keys saved successfully!
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
+
