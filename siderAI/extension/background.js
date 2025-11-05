@@ -7,13 +7,6 @@ chrome.action.onClicked.addListener(async (tab) => {
   if (!tab || !tab.id) return;
   
   try {
-    // Try to get current state
-    try {
-      await chrome.tabs.sendMessage(tab.id, { type: 'GET_PANEL_STATE' });
-    } catch (e) {
-      // Content script might not be ready, that's okay
-    }
-    
     // Toggle panel
     chrome.tabs.sendMessage(tab.id, { type: 'TOGGLE_PANEL' }, (response) => {
       if (chrome.runtime.lastError) {
