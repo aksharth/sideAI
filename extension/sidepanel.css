@@ -42,6 +42,139 @@ body {
   background: #ffffff;
   flex-shrink: 0;
   box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+  transition: width 0.3s ease, padding 0.3s ease;
+}
+
+.sider-panel-sidebar.sider-sidebar-collapsed {
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.sider-sidebar-hamburger {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+
+.sider-sidebar-hamburger:hover {
+  background: #f9fafb;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.sider-sidebar-hamburger svg {
+  width: 20px;
+  height: 20px;
+  color: #6b7280;
+}
+
+.sider-sidebar-hamburger:hover svg {
+  color: #111827;
+}
+
+.sider-sidebar-popup {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 280px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px 0 0 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  overflow: hidden;
+}
+
+.sider-sidebar-popup-header {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.sider-sidebar-popup-header .sider-sidebar-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+}
+
+.sider-sidebar-popup-content {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 12px;
+}
+
+.sider-sidebar-popup-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: transparent;
+}
+
+.sider-sidebar-popup-item:hover {
+  background: #f3f4f6;
+}
+
+.sider-sidebar-popup-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.sider-sidebar-popup-item:hover .sider-sidebar-popup-icon {
+  background: #ffffff;
+  color: #111827;
+}
+
+.sider-sidebar-popup-icon.sider-sidebar-icon-purple {
+  color: #8b5cf6;
+}
+
+.sider-sidebar-popup-item:hover .sider-sidebar-popup-icon.sider-sidebar-icon-purple {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
+
+.sider-sidebar-popup-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sider-sidebar-popup-item span {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.sider-sidebar-popup-item:hover span {
+  color: #111827;
 }
 
 .sider-sidebar-icon {

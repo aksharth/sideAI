@@ -604,6 +604,16 @@
     const imgSrc = img.src || img.currentSrc || img.dataset.src;
     const imgAlt = img.alt || 'Image';
 
+    chrome.storage.sync.get(['sider_app_base_url'], (result) => {
+      const baseUrl = result.sider_app_base_url || 'http://localhost:3000';
+      const params = new URLSearchParams({
+        tool: tool,
+        imageUrl: imgSrc,
+        imageAlt: imgAlt || 'Image'
+      });
+      const url = `${baseUrl}/image-tool?${params.toString()}`;
+      window.open(url, '_blank');
+    });
     window.dispatchEvent(new CustomEvent('sider:image-tool', {
       detail: { tool, src: imgSrc, alt: imgAlt, element: img }
     }));
