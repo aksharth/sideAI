@@ -70,6 +70,93 @@
     }
   }
   
+  function toggleNavbar() {
+    const sidebar = document.querySelector('.sider-panel-sidebar');
+    const hamburger = document.getElementById('sider-sidebar-hamburger');
+    const popup = document.getElementById('sider-sidebar-popup');
+    
+    if (sidebar) {
+      const isCollapsed = sidebar.classList.contains('sider-sidebar-collapsed');
+      if (isCollapsed) {
+        sidebar.classList.remove('sider-sidebar-collapsed');
+        sidebar.style.width = '48px';
+        sidebar.style.padding = '12px 8px';
+        sidebar.style.overflow = 'visible';
+        if (hamburger) hamburger.style.display = 'none';
+        if (popup) popup.style.display = 'none';
+      } else {
+        sidebar.classList.add('sider-sidebar-collapsed');
+        sidebar.style.width = '0';
+        sidebar.style.padding = '0';
+        sidebar.style.overflow = 'hidden';
+        if (hamburger) hamburger.style.display = 'flex';
+      }
+    }
+  }
+  
+  function showSidebarPopup() {
+    const popup = document.getElementById('sider-sidebar-popup');
+    if (popup) {
+      popup.style.display = 'block';
+    }
+  }
+  
+  function hideSidebarPopup() {
+    const popup = document.getElementById('sider-sidebar-popup');
+    if (popup) {
+      popup.style.display = 'none';
+    }
+  }
+  
+  function openFullPageChat() {
+    // Get base URL from storage or use default
+    chrome.storage.sync.get(['sider_app_base_url'], (result) => {
+      const baseUrl = result.sider_app_base_url || 'http://localhost:3000';
+      window.open(baseUrl, '_blank');
+    });
+  }
+  
+  function handleSidebarAction(action) {
+    switch(action) {
+      case 'chat':
+        // Handle chat action
+        break;
+      case 'documents':
+        // Handle documents action
+        break;
+      case 'refresh':
+        // Handle refresh action
+        break;
+      case 'more':
+        // Handle more options
+        break;
+      case 'link':
+        // Handle link action
+        break;
+      case 'share':
+        // Handle share action
+        break;
+      case 'layers':
+        // Handle layers action
+        break;
+      case 'mobile':
+        // Handle mobile action
+        break;
+      case 'target':
+        // Handle target action
+        break;
+      case 'profile':
+        // Handle profile action
+        const profileIcon = document.getElementById('sider-profile-icon');
+        if (profileIcon) {
+          profileIcon.click();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  
   function handleAction(action) {
     const chatContainer = document.getElementById('sider-chat-container');
     const welcome = document.querySelector('.sider-welcome');
@@ -1181,6 +1268,83 @@
     
     if (generationModelOptions && generationModelOptions.length > 0) {
       generationModelOptions[0].classList.add('sider-generation-model-option-selected');
+    }
+    
+    // Collapse Nav Bar button
+    const collapseNavbarBtn = document.getElementById('sider-collapse-navbar-btn');
+    collapseNavbarBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNavbar();
+    });
+    
+    // Full page chat button
+    const fullpageChatBtn = document.getElementById('sider-fullpage-chat-btn');
+    fullpageChatBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFullPageChat();
+    });
+    
+    // Hamburger menu (when collapsed)
+    const hamburger = document.getElementById('sider-sidebar-hamburger');
+    const sidebarPopup = document.getElementById('sider-sidebar-popup');
+    
+    if (hamburger) {
+      hamburger.addEventListener('mouseenter', () => {
+        showSidebarPopup();
+      });
+      
+      hamburger.addEventListener('mouseleave', (e) => {
+        if (!sidebarPopup?.contains(e.relatedTarget)) {
+          setTimeout(() => {
+            if (!sidebarPopup?.matches(':hover')) {
+              hideSidebarPopup();
+            }
+          }, 100);
+        }
+      });
+    }
+    
+    if (sidebarPopup) {
+      sidebarPopup.addEventListener('mouseenter', () => {
+        sidebarPopup.style.display = 'block';
+      });
+      
+      sidebarPopup.addEventListener('mouseleave', () => {
+        hideSidebarPopup();
+      });
+      
+      // Expand Nav Bar button in popup
+      const expandNavbarPopupBtn = document.getElementById('sider-expand-navbar-popup-btn');
+      expandNavbarPopupBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleNavbar();
+        hideSidebarPopup();
+      });
+      
+      // Full page chat button in popup
+      const fullpageChatPopupBtn = document.getElementById('sider-fullpage-chat-popup-btn');
+      fullpageChatPopupBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openFullPageChat();
+        hideSidebarPopup();
+      });
+      
+      // Popup items click handlers
+      const popupItems = sidebarPopup.querySelectorAll('.sider-sidebar-popup-item');
+      popupItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = item.getAttribute('data-action');
+          handleSidebarAction(action);
+          hideSidebarPopup();
+        });
+      });
+    }
+    
+    // Check initial state
+    const sidebar = document.querySelector('.sider-panel-sidebar');
+    if (sidebar && sidebar.classList.contains('sider-sidebar-collapsed')) {
+      if (hamburger) hamburger.style.display = 'flex';
     }
     
     // Action buttons

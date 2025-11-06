@@ -264,10 +264,23 @@
     </div>
     
     <div class="sider-panel-sidebar">
-      <div class="sider-sidebar-icon" title="Code/Format">
+      <div class="sider-sidebar-icon" id="sider-collapse-navbar-btn" title="Collapse Nav Bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+          <line x1="19" y1="12" x2="19" y2="12" stroke-width="3"/>
+        </svg>
+      </div>
+      <div class="sider-sidebar-icon" id="sider-fullpage-chat-btn" title="Full page chat">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="16 18 22 12 16 6"/>
           <polyline points="8 6 2 12 8 18"/>
+        </svg>
+      </div>
+      <div class="sider-sidebar-hamburger" id="sider-sidebar-hamburger" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
         </svg>
       </div>
       <div class="sider-sidebar-icon sider-sidebar-icon-purple" title="Chat">
@@ -339,6 +352,123 @@
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
           <circle cx="12" cy="7" r="4"/>
         </svg>
+      </div>
+    </div>
+    
+    <div class="sider-sidebar-popup" id="sider-sidebar-popup" style="display: none;">
+      <div class="sider-sidebar-popup-header">
+        <div class="sider-sidebar-icon" id="sider-expand-navbar-popup-btn" title="Expand Nav Bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"/>
+            <line x1="19" y1="12" x2="19" y2="12" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="sider-sidebar-icon" id="sider-fullpage-chat-popup-btn" title="Full page chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+        </div>
+      </div>
+      <div class="sider-sidebar-popup-content">
+        <div class="sider-sidebar-popup-item" data-action="chat">
+          <div class="sider-sidebar-popup-icon sider-sidebar-icon-purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <span>Chat</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="documents">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </div>
+          <span>Documents</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="refresh">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </div>
+          <span>Refresh</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="more">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="1"/>
+              <circle cx="19" cy="12" r="1"/>
+              <circle cx="5" cy="12" r="1"/>
+            </svg>
+          </div>
+          <span>More</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="link">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
+          <span>Link</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="share">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </div>
+          <span>Share</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="layers">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </div>
+          <span>Layers</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="mobile">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+              <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+          </div>
+          <span>Mobile</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="target">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+          </div>
+          <span>Target</span>
+        </div>
+        <div class="sider-sidebar-popup-item" data-action="profile">
+          <div class="sider-sidebar-popup-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <span>Profile</span>
+        </div>
       </div>
     </div>
     
