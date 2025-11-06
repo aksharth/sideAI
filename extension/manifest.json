@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "SiderAI Chat Assistant",
+  "version": "1.0.0",
+  "description": "Chat with multiple AI models (ChatGPT, Gemini, and more) directly from your browser",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["ai-modules.js", "toolbar.js", "image-preview.js", "login-modal.js", "content.js"],
+      "css": ["ai-modules.css", "toolbar.css", "image-preview.css", "login-modal.css", "content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {},
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*.png", "svg/*.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+
