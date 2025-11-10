@@ -718,20 +718,56 @@
     });
   }
 
+  function buildImageToolUrl(tool, imgSrc, imgAlt, baseUrl) {
+    const params = new URLSearchParams({
+      imageUrl: imgSrc,
+      imageAlt: imgAlt || 'Image'
+    });
+    
+    if (tool === 'bg-remover') {
+      return `${baseUrl}/create/image/background-remover?${params.toString()}`;
+    } else {
+      params.set('tool', tool);
+      return `${baseUrl}/image-tool?${params.toString()}`;
+    }
+  }
+
   function handleImageToolAction(tool, img) {
     const imgSrc = img.src || img.currentSrc || img.dataset.src;
     const imgAlt = img.alt || 'Image';
+    const defaultBaseUrl = 'http://localhost:3000';
 
-    chrome.storage.sync.get(['sider_app_base_url'], (result) => {
-      const baseUrl = result.sider_app_base_url || 'http://localhost:3000';
-      const params = new URLSearchParams({
-        tool: tool,
-        imageUrl: imgSrc,
-        imageAlt: imgAlt || 'Image'
-      });
-      const url = `${baseUrl}/image-tool?${params.toString()}`;
-      window.open(url, '_blank');
-    });
+    const openUrl = (baseUrl) => {
+      try {
+        const url = buildImageToolUrl(tool, imgSrc, imgAlt, baseUrl);
+        window.open(url, '_blank');
+      } catch (err) {
+        const url = buildImageToolUrl(tool, imgSrc, imgAlt, defaultBaseUrl);
+        window.open(url, '_blank');
+      }
+    };
+
+    try {
+      if (chrome.storage && chrome.storage.sync) {
+        chrome.storage.sync.get(['sider_app_base_url'], (result) => {
+          if (chrome.runtime.lastError) {
+            openUrl(defaultBaseUrl);
+            return;
+          }
+          try {
+            const baseUrl = result.sider_app_base_url || defaultBaseUrl;
+            openUrl(baseUrl);
+          } catch (err) {
+            openUrl(defaultBaseUrl);
+          }
+        });
+      } else {
+        openUrl(defaultBaseUrl);
+      }
+    } catch (err) {
+      openUrl(defaultBaseUrl);
+    }
+    
     window.dispatchEvent(new CustomEvent('sider:image-tool', {
       detail: { tool, src: imgSrc, alt: imgAlt, element: img }
     }));
