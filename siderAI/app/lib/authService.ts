@@ -1,13 +1,27 @@
-const API_BASE_URL = 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
+import { API_BASE_URL, API_ENDPOINTS, getApiUrl } from './apiConfig';
 
 export interface AuthResponse {
   token?: string;
   access_token?: string;
+  accessToken?: string;
   user?: {
     id?: string;
     name?: string;
     email?: string;
+    username?: string;
   };
+  data?: {
+    token?: string;
+    access_token?: string;
+    user?: {
+      id?: string;
+      name?: string;
+      email?: string;
+      username?: string;
+    };
+  };
+  // Include headers in response for token extraction
+  _headers?: Headers;
 }
 
 export async function loginUser(
@@ -25,7 +39,7 @@ export async function loginUser(
 
   for (const endpoint of endpoints) {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(getApiUrl(endpoint), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -38,7 +52,8 @@ export async function loginUser(
 
       if (response.ok) {
         const data = await response.json();
-        return data;
+        // Attach headers to response for token extraction
+        return { ...data, _headers: response.headers };
       } else {
         lastError = await response.json();
       }
@@ -59,7 +74,7 @@ export async function signupUser(
   password: string
 ): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    const response = await fetch(getApiUrl(API_ENDPOINTS.AUTH.REGISTER), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +94,8 @@ export async function signupUser(
     }
 
     const data = await response.json();
-    return data;
+    // Attach headers to response for token extraction
+    return { ...data, _headers: response.headers };
   } catch (err) {
     if (err instanceof Error) {
       throw err;
@@ -104,7 +120,7 @@ export async function loginWithGoogle(): Promise<void> {
 
   // Try the endpoint without /api first
   const popup = window.open(
-    `${API_BASE_URL}${endpoints[0]}`,
+    getApiUrl(endpoints[0]),
     'Google Login',
     `width=${width},height=${height},left=${left},top=${top}`
   );
