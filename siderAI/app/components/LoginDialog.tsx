@@ -31,23 +31,52 @@ export default function LoginDialog({
     setLoading(true);
     try {
       const res = await loginUser(email, password);
-      console.log('Login success:', res);
-      localStorage.setItem('authToken', res?.token || '');
-      if (res?.user) {
-        localStorage.setItem('user', JSON.stringify(res.user));
-      } else {
-        // Store basic user info from email
-        const userData = {
-          name: email.split('@')[0] || 'User',
-          email: email,
-          username: email.split('@')[0] || 'User',
-        };
-        localStorage.setItem('user', JSON.stringify(userData));
+      console.log('Login success - full response:', res);
+      
+      // Check multiple possible token fields in body
+      let token = 
+        res?.token || 
+        res?.access_token || 
+        res?.accessToken ||
+        res?.data?.token ||
+        res?.data?.access_token ||
+        '';
+      
+      // Also check response headers for token
+      if (!token && res?._headers) {
+        token = 
+          res._headers.get('Authorization')?.replace('Bearer ', '') ||
+          res._headers.get('X-Auth-Token') ||
+          res._headers.get('X-Access-Token') ||
+          res._headers.get('access-token') ||
+          '';
       }
+      
+      console.log('Extracted token:', token ? 'Token found' : 'No token found');
+      console.log('Response keys:', Object.keys(res || {}));
+      if (res?._headers) {
+        console.log('Response headers:', Array.from(res._headers.entries()));
+      }
+      
+      if (token) {
+        localStorage.setItem('authToken', token);
+        console.log('Token stored in localStorage');
+      } else {
+        console.warn('No token found in response. Response structure:', JSON.stringify(res, null, 2));
+      }
+      
+      // Store user data
+      const userData = res?.user || res?.data?.user || {
+        name: email.split('@')[0] || 'User',
+        email: email,
+        username: email.split('@')[0] || 'User',
+      };
+      localStorage.setItem('user', JSON.stringify(userData));
+      
       onClose();
       router.push('/chat');
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       alert('Login failed');
     } finally {
       setLoading(false);

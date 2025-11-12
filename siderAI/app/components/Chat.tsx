@@ -5,20 +5,18 @@ import { motion } from 'framer-motion';
 import {
   MessageCircle,
   Sparkles,
-  FileText,
   Layout,
   PenTool,
   Presentation,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Bell,
   Folder,
   Settings,
   Mic,
   Search,
   Lightbulb,
-  Paperclip,
-  Split,
   Zap,
   Grid3x3,
   Palette,
@@ -27,13 +25,34 @@ import {
   Eraser,
   ScanSearch,
   Maximize2,
+  Minimize2,
+  ZoomIn,
+  ZoomOut,
   Layers,
   Languages,
   Image as ImageIcon,
   Video,
   Square as SquareIcon,
+  Send,
+  Star,
+  X,
+  Paperclip,
+  Upload,
+  Calculator,
+  FileText,
+  ChevronDown as ChevronDownIcon,
+  History,
+  Plus,
+  Trash2,
+  Globe,
+  FolderPlus,
+  BarChart3,
+  Brain,
+  Edit,
+  Sliders,
 } from 'lucide-react';
 import UserProfileDropdown from './UserProfileDropdown';
+import { getApiUrl, API_ENDPOINTS } from '../lib/apiConfig';
 
 interface DropdownPosition {
   top: number;
@@ -46,12 +65,66 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   isGenerating?: boolean;
+  images?: string[]; // Array of image preview URLs for user messages
 }
 
 interface Model {
   id: string;
   name: string;
+  icon?: React.ReactNode;
+  category?: 'basic' | 'advanced' | 'other';
 }
+
+const AVAILABLE_MODELS: Model[] = [
+  // Basic models
+  { id: 'gpt-4o-mini', name: 'gpt-4o-mini', category: 'basic' },
+  { id: 'sider-fusion', name: 'Sider Fusion', category: 'basic' },
+  { id: 'gpt-5-mini', name: 'GPT-5 mini', category: 'basic' },
+  { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5', category: 'basic' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', category: 'basic' },
+  // Advanced models
+  { id: 'gpt-5', name: 'GPT-5', category: 'advanced' },
+  { id: 'gpt-4.1', name: 'GPT-4.1', category: 'advanced' },
+  { id: 'deepseek-v3.1', name: 'DeepSeek v3.1', category: 'advanced' },
+  { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', category: 'advanced' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', category: 'advanced' },
+  { id: 'grok-4', name: 'Grok 4', category: 'advanced' },
+];
+
+const OTHER_MODELS: Model[] = [
+  { id: 'claude-3.5-haiku', name: 'Claude 3.5 Haiku', category: 'other' },
+  { id: 'kimi-k2', name: 'Kimi K2', category: 'other' },
+  { id: 'deepseek-v3', name: 'DeepSeek V3', category: 'other' },
+  { id: 'claude-3.7-sonnet', name: 'Claude 3.7 Sonnet', category: 'other' },
+  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', category: 'other' },
+  { id: 'claude-opus-4.1', name: 'Claude Opus 4.1', category: 'other' },
+];
+
+const getModelIcon = (modelId: string) => {
+  const iconClass = 'w-4 h-4';
+  if (modelId.includes('gpt-4o-mini')) {
+    return <Sparkles className={iconClass} />;
+  }
+  if (modelId.includes('sider-fusion')) {
+    return <Zap className={iconClass} />;
+  }
+  if (modelId.includes('claude')) {
+    return <Star className={iconClass} />;
+  }
+  if (modelId.includes('gemini')) {
+    return <Star className={iconClass} />;
+  }
+  if (modelId.includes('deepseek')) {
+    return <Star className={iconClass} />;
+  }
+  if (modelId.includes('grok')) {
+    return <X className={iconClass} />;
+  }
+  if (modelId.includes('kimi')) {
+    return <X className={iconClass} />;
+  }
+  return <Sparkles className={iconClass} />;
+};
 
 interface UserData {
   name?: string;
@@ -60,13 +133,24 @@ interface UserData {
 }
 
 export default function Chat() {
-  const [selectedModel, setSelectedModel] = useState('Sider Fusion');
-  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const availableModels = AVAILABLE_MODELS;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isOtherModelsHovered, setIsOtherModelsHovered] = useState(false);
+  const otherModelsRef = useRef<HTMLButtonElement>(null);
+  const [viewMode, setViewMode] = useState<'single' | 'double'>('single');
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  
+  // Second panel state for double view
+  const [selectedModel2, setSelectedModel2] = useState('GPT-5 mini');
+  const [messages2, setMessages2] = useState<Message[]>([]);
+  const [isGenerating2, setIsGenerating2] = useState(false);
+  const [conversationId2, setConversationId2] = useState<string | null>(null);
+  const [isModelDropdownOpen2, setIsModelDropdownOpen2] = useState(false);
+  const [isPanel2Open, setIsPanel2Open] = useState(true);
   const [isMoreHovered, setIsMoreHovered] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({
     top: 0,
@@ -80,8 +164,82 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const abortController1Ref = useRef<AbortController | null>(null);
+  const abortController2Ref = useRef<AbortController | null>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const userProfileButtonRef = useRef<HTMLButtonElement>(null);
+  const otherModelsDropdownRef = useRef<HTMLDivElement>(null);
+  const [isAttachmentDropdownOpen, setIsAttachmentDropdownOpen] = useState(false);
+  const attachmentButtonRef = useRef<HTMLButtonElement>(null);
+  const attachmentDropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [filePreviews, setFilePreviews] = useState<{ file: File; preview: string }[]>([]);
+  const [isTranslateDropdownOpen, setIsTranslateDropdownOpen] = useState<number | null>(null);
+
+  // Debug: Log filePreviews changes
+  useEffect(() => {
+    console.log('filePreviews state changed:', filePreviews.length, 'files');
+    if (filePreviews.length > 0) {
+      console.log('File previews:', filePreviews.map(p => ({ name: p.file.name, preview: p.preview })));
+    }
+  }, [filePreviews]);
+  const translateDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [isImageMinimized, setIsImageMinimized] = useState(false);
+  const [isImageMaximized, setIsImageMaximized] = useState(false);
+  const [imageZoom, setImageZoom] = useState(1);
+  const imageModalRef = useRef<HTMLDivElement>(null);
+  const [isChatControlsOpen, setIsChatControlsOpen] = useState(false);
+  const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
+  const [chatHistoryTab, setChatHistoryTab] = useState<'all' | 'starred'>('all');
+  const [chatHistorySearch, setChatHistorySearch] = useState('');
+  const chatControlsRef = useRef<HTMLDivElement>(null);
+  const chatControlsButtonRef = useRef<HTMLButtonElement>(null);
+  const chatHistoryRef = useRef<HTMLDivElement>(null);
+  const [isImageModelDropdownOpen, setIsImageModelDropdownOpen] = useState(false);
+  const [selectedImageModel, setSelectedImageModel] = useState('Medium');
+  const imageModelDropdownRef = useRef<HTMLDivElement>(null);
+  const imageModelButtonRef = useRef<HTMLButtonElement>(null);
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('Auto');
+  const [languageSearch, setLanguageSearch] = useState('');
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
+  const languageButtonRef = useRef<HTMLButtonElement>(null);
+  
+  // Chat history data structure
+  interface ChatHistoryItem {
+    id: string;
+    title: string;
+    preview: string;
+    timestamp: Date;
+    starred: boolean;
+  }
+  
+  const [chatHistory, setChatHistory] = useState<ChatHistoryItem[]>([]);
+
+  // Languages list for translate dropdown
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'de', name: 'German' },
+    { code: 'it', name: 'Italian' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'ru', name: 'Russian' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' },
+    { code: 'zh', name: 'Chinese' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'hi', name: 'Hindi' },
+    { code: 'nl', name: 'Dutch' },
+    { code: 'pl', name: 'Polish' },
+    { code: 'tr', name: 'Turkish' },
+    { code: 'sv', name: 'Swedish' },
+    { code: 'da', name: 'Danish' },
+    { code: 'no', name: 'Norwegian' },
+    { code: 'fi', name: 'Finnish' },
+    { code: 'cs', name: 'Czech' },
+  ];
 
   useEffect(() => {
     if (isMoreHovered && moreButtonRef.current) {
@@ -195,34 +353,9 @@ export default function Chat() {
     }
   };
 
-  // Fetch available models
-  useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const response = await fetch('/api/chat/models');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.code === 0 && data.data) {
-            // Assuming data.data is an array of models or an object with models
-            const models = Array.isArray(data.data) ? data.data : data.data.models || [];
-            setAvailableModels(models);
-            // Set default model if none selected and models are available
-            if (models.length > 0 && selectedModel === 'Sider Fusion') {
-              const defaultModel = models.find((m: Model) => m.name === 'Sider Fusion') || models[0];
-              setSelectedModel(defaultModel.name || defaultModel.id);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching models:', error);
-      }
-    };
+  // Models are now hardcoded in AVAILABLE_MODELS constant
 
-    fetchModels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Close model dropdown when clicking outside
+  // Close model dropdown and attachment dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -231,61 +364,580 @@ export default function Chat() {
       ) {
         setIsModelDropdownOpen(false);
       }
+      if (
+        attachmentDropdownRef.current &&
+        attachmentButtonRef.current &&
+        !attachmentDropdownRef.current.contains(event.target as Node) &&
+        !attachmentButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsAttachmentDropdownOpen(false);
+      }
+      if (
+        translateDropdownRef.current &&
+        !translateDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsTranslateDropdownOpen(null);
+      }
+      if (
+        chatControlsRef.current &&
+        chatControlsButtonRef.current &&
+        !chatControlsRef.current.contains(event.target as Node) &&
+        !chatControlsButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsChatControlsOpen(false);
+      }
+      if (
+        imageModelDropdownRef.current &&
+        imageModelButtonRef.current &&
+        !imageModelDropdownRef.current.contains(event.target as Node) &&
+        !imageModelButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsImageModelDropdownOpen(false);
+      }
+      if (
+        languageDropdownRef.current &&
+        languageButtonRef.current &&
+        !languageDropdownRef.current.contains(event.target as Node) &&
+        !languageButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsLanguageDropdownOpen(false);
+      }
     };
 
-    if (isModelDropdownOpen) {
+    const shouldAddListener = isModelDropdownOpen || isAttachmentDropdownOpen || isTranslateDropdownOpen !== null || isChatControlsOpen || isImageModelDropdownOpen || isLanguageDropdownOpen;
+    
+    if (shouldAddListener) {
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  }, [isModelDropdownOpen]);
+    
+    // Always return a cleanup function
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isModelDropdownOpen, isAttachmentDropdownOpen, isTranslateDropdownOpen, isChatControlsOpen, isImageModelDropdownOpen, isLanguageDropdownOpen]);
 
-  const handleSendMessage = async () => {
-    if (!inputValue.trim() || isGenerating) return;
+  const handleAttachmentClick = () => {
+    setIsAttachmentDropdownOpen(!isAttachmentDropdownOpen);
+  };
 
+  const handleFileSelect = () => {
+    setIsAttachmentDropdownOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files);
+      
+      // Create previews for image files
+      const newPreviews = fileArray
+        .filter((file) => file.type.startsWith('image/'))
+        .map((file) => ({
+          file,
+          preview: URL.createObjectURL(file),
+        }));
+      
+      console.log('Files selected:', fileArray.length, 'Image files:', newPreviews.length);
+      console.log('New previews created:', newPreviews);
+      
+      setFilePreviews((prev) => {
+        const updated = [...prev, ...newPreviews];
+        console.log('Updated filePreviews:', updated.length, 'previews');
+        return updated;
+      });
+    }
+    // Reset input value to allow selecting the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    const preview = filePreviews[index];
+    // Revoke object URL to free memory
+    URL.revokeObjectURL(preview.preview);
+    
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleExtractText = async () => {
+    const message = 'Extract text from this image';
+    const filesToUpload = filePreviews.map(preview => preview.file);
+    const imagePreviews = filePreviews.map(p => p.preview);
+    
+    // Clear file previews immediately when button is clicked
+    if (filePreviews.length > 0) {
+      setFilePreviews([]);
+    }
+    
+    if (viewMode === 'double') {
+      if (isGenerating || isGenerating2) return;
+      const abortController1 = new AbortController();
+      const abortController2 = new AbortController();
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+      if (isPanel2Open) {
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+      }
+    } else {
+      if (isGenerating) return;
+      const abortController = new AbortController();
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+    }
+  };
+
+  const handleMathSolver = async () => {
+    const message = 'Solve the math problems in this image';
+    const filesToUpload = filePreviews.map(preview => preview.file);
+    const imagePreviews = filePreviews.map(p => p.preview);
+    
+    // Clear file previews immediately when button is clicked
+    if (filePreviews.length > 0) {
+      setFilePreviews([]);
+    }
+    
+    if (viewMode === 'double') {
+      if (isGenerating || isGenerating2) return;
+      const abortController1 = new AbortController();
+      const abortController2 = new AbortController();
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+      if (isPanel2Open) {
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+      }
+    } else {
+      if (isGenerating) return;
+      const abortController = new AbortController();
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+    }
+  };
+
+  const handleTranslate = async (languageCode: string, languageName: string) => {
+    setIsTranslateDropdownOpen(null);
+    const message = `Translate the text in this image to ${languageName}`;
+    const filesToUpload = filePreviews.map(preview => preview.file);
+    const imagePreviews = filePreviews.map(p => p.preview);
+    
+    // Clear file previews immediately when button is clicked
+    if (filePreviews.length > 0) {
+      setFilePreviews([]);
+    }
+    
+    if (viewMode === 'double') {
+      if (isGenerating || isGenerating2) return;
+      const abortController1 = new AbortController();
+      const abortController2 = new AbortController();
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+      if (isPanel2Open) {
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+      }
+    } else {
+      if (isGenerating) return;
+      const abortController = new AbortController();
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+    }
+  };
+
+  const handleImageClick = (index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageMinimized(false);
+    setIsImageMaximized(false);
+    setImageZoom(1);
+  };
+
+  const handleCloseImageModal = () => {
+    setSelectedImageIndex(null);
+    setIsImageMinimized(false);
+    setIsImageMaximized(false);
+    setImageZoom(1);
+  };
+
+
+  const handleZoomIn = () => {
+    setImageZoom((prev) => Math.min(prev + 0.25, 5));
+  };
+
+  const handleZoomOut = () => {
+    setImageZoom((prev) => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleResetZoom = () => {
+    setImageZoom(1);
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setMessages2([]);
+    setConversationId(null);
+    setConversationId2(null);
+    setInputValue('');
+    setFilePreviews([]);
+    setIsChatHistoryOpen(false);
+  };
+
+  const handleStarChat = (chatId: string) => {
+    setChatHistory((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId ? { ...chat, starred: !chat.starred } : chat
+      )
+    );
+  };
+
+  const handleDeleteChat = (chatId: string) => {
+    setChatHistory((prev) => prev.filter((chat) => chat.id !== chatId));
+  };
+
+  const getFilteredChatHistory = () => {
+    let filtered = chatHistory;
+    
+    if (chatHistoryTab === 'starred') {
+      filtered = filtered.filter((chat) => chat.starred);
+    }
+    
+    if (chatHistorySearch.trim()) {
+      const searchLower = chatHistorySearch.toLowerCase();
+      filtered = filtered.filter(
+        (chat) =>
+          chat.title.toLowerCase().includes(searchLower) ||
+          chat.preview.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  };
+
+  const formatChatDate = (date: Date) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const chatDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffTime = today.getTime() - chatDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return 'This Month';
+    return 'Earlier';
+  };
+
+  // Handle mouse wheel zoom
+  useEffect(() => {
+    if (selectedImageIndex !== null && imageModalRef.current) {
+      const handleWheel = (e: WheelEvent) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (e.deltaY < 0) {
+            setImageZoom((prev) => Math.min(prev + 0.25, 5));
+          } else {
+            setImageZoom((prev) => Math.max(prev - 0.25, 0.5));
+          }
+        }
+      };
+      const modalElement = imageModalRef.current;
+      modalElement.addEventListener('wheel', handleWheel, { passive: false });
+      return () => {
+        modalElement.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [selectedImageIndex]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => {
+      filePreviews.forEach((preview) => {
+        URL.revokeObjectURL(preview.preview);
+      });
+    };
+  }, [filePreviews]);
+
+  // Save chat to history when conversation is created or messages are sent
+  useEffect(() => {
+    if (messages.length > 0 && conversationId) {
+      const firstUserMessage = messages.find((msg) => msg.role === 'user');
+      const lastAssistantMessage = messages.filter((msg) => msg.role === 'assistant').pop();
+      
+      if (firstUserMessage) {
+        const existingChatIndex = chatHistory.findIndex((chat) => chat.id === conversationId);
+        const chatItem: ChatHistoryItem = {
+          id: conversationId,
+          title: firstUserMessage.content.substring(0, 50) || 'New Chat',
+          preview: lastAssistantMessage?.content.substring(0, 100) || firstUserMessage.content.substring(0, 100) || 'No preview',
+          timestamp: new Date(),
+          starred: existingChatIndex >= 0 ? chatHistory[existingChatIndex].starred : false,
+        };
+
+        if (existingChatIndex >= 0) {
+          setChatHistory((prev) =>
+            prev.map((chat, index) => (index === existingChatIndex ? chatItem : chat))
+          );
+        } else {
+          setChatHistory((prev) => [chatItem, ...prev]);
+        }
+      }
+    }
+  }, [messages, conversationId]);
+
+  // Helper function to send message to a specific panel
+  // Upload files to the API
+  const uploadFiles = async (files: File[], abortController: AbortController): Promise<string[]> => {
+    if (files.length === 0) return [];
+    
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken || !authToken.trim()) {
+      throw new Error('Authentication required. Please login first.');
+    }
+
+    const uploadedFileIds: string[] = [];
+
+    // Upload each file
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        // Try different field names that APIs commonly use
+        formData.append('file', file);
+        // Some APIs also expect the filename explicitly
+        formData.append('filename', file.name);
+
+        const response = await fetch(getApiUrl(API_ENDPOINTS.FILES.UPLOAD), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken.trim()}`,
+            // Don't set Content-Type - let browser set it automatically for FormData with correct boundary
+          },
+          body: formData,
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          let errorData;
+          let errorText = '';
+          try {
+            errorData = await response.json();
+          } catch {
+            try {
+              errorText = await response.text();
+              errorData = { detail: errorText || `Failed to upload file: ${file.name} (Status: ${response.status})` };
+            } catch {
+              errorData = { detail: `Failed to upload file: ${file.name} (Status: ${response.status})` };
+            }
+          }
+          
+          if (response.status === 401 || errorData.detail === 'Authentication required') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
+          
+          // Log the full error for debugging
+          console.error('File upload error details:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+            errorText: errorText,
+            file: file.name,
+            fileSize: file.size,
+            fileType: file.type,
+            url: getApiUrl(API_ENDPOINTS.FILES.UPLOAD)
+          });
+          
+          // Show more detailed error message
+          const errorMessage = errorData.detail || errorData.message || errorData.error || errorText || `Failed to upload file: ${file.name} (Status: ${response.status})`;
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        // Extract file ID from response structure: { code: 0, msg: "", data: { id: "...", ... } }
+        const fileId = data?.data?.id || data?.id || data?.file_id || data?.data?.file_id;
+        if (fileId) {
+          uploadedFileIds.push(fileId);
+          console.log('File uploaded successfully:', {
+            fileId: fileId,
+            filename: data?.data?.original_filename || file.name,
+            fileType: data?.data?.file_type || data?.data?.mime_type
+          });
+        } else {
+          console.warn('File uploaded but no ID returned. Full response:', data);
+          throw new Error('File uploaded but no file ID returned from server');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw error;
+        }
+        console.error(`Error uploading file ${file.name}:`, error);
+        throw error;
+      }
+    }
+
+    return uploadedFileIds;
+  };
+
+  const sendMessageToPanel = async (
+    panelNumber: 1 | 2,
+    messageText: string,
+    model: string,
+    conversationIdState: string | null,
+    setConversationIdState: (id: string | null) => void,
+    setMessagesState: React.Dispatch<React.SetStateAction<Message[]>>,
+    setIsGeneratingState: (value: boolean) => void,
+    abortController: AbortController,
+    files?: File[],
+    imagePreviews?: string[] // Optional preview URLs to use instead of creating new ones
+  ) => {
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `${Date.now()}-${panelNumber}`,
       role: 'user',
-      content: inputValue.trim(),
+      content: messageText,
+      images: imagePreviews && imagePreviews.length > 0 
+        ? imagePreviews 
+        : (files && files.length > 0 ? files.map(f => URL.createObjectURL(f)) : undefined),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    const messageText = inputValue.trim();
-    setInputValue('');
-    setIsGenerating(true);
+    setMessagesState((prev) => [...prev, userMessage]);
 
-    // Create AI message placeholder
-    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessageId = `${Date.now() + 1}-${panelNumber}`;
     const aiMessage: Message = {
       id: aiMessageId,
       role: 'assistant',
       content: '',
       isGenerating: true,
     };
-    setMessages((prev) => [...prev, aiMessage]);
-
-    // Abort previous request if any
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
+    setMessagesState((prev) => [...prev, aiMessage]);
+    setIsGeneratingState(true);
 
     try {
-      const response = await fetch('/api/chat/send', {
+      const authToken = localStorage.getItem('authToken');
+      
+      if (!authToken || !authToken.trim()) {
+        throw new Error('Authentication required. Please login first.');
+      }
+      
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken.trim()}`,
+      };
+
+      // Step 1: Create conversation if it doesn't exist
+      let currentConversationId = conversationIdState;
+      if (!currentConversationId) {
+        try {
+          const conversationResponse = await fetch(getApiUrl(API_ENDPOINTS.CONVERSATIONS.CREATE), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title: messageText.substring(0, 50) || 'New Conversation',
+              model: model,
+            }),
+            signal: abortController.signal,
+          });
+
+          if (!conversationResponse.ok) {
+            const errorData = await conversationResponse.json().catch(() => ({ detail: 'Failed to create conversation' }));
+            if (conversationResponse.status === 422 && errorData.detail) {
+              const errorMsg = Array.isArray(errorData.detail) 
+                ? errorData.detail.map((e: { msg?: string; message?: string }) => e.msg || e.message).join(', ')
+                : errorData.detail;
+              throw new Error(`Validation error: ${errorMsg}`);
+            }
+            throw new Error(errorData.detail || errorData.message || 'Failed to create conversation');
+          }
+
+          const conversationData = await conversationResponse.json();
+          currentConversationId = conversationData?.data?.id || conversationData?.id || conversationData?.conversation_id || conversationData?.data?.conversation_id || null;
+          
+          if (currentConversationId) {
+            setConversationIdState(currentConversationId);
+          } else {
+            throw new Error('Failed to get conversation ID from response');
+          }
+        } catch (error) {
+          // Don't throw if request was aborted
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+          console.error('Error creating conversation:', error);
+          throw error;
+        }
+      }
+
+      // Step 2: Upload files if any
+      let fileIds: string[] = [];
+      if (files && files.length > 0) {
+        try {
+          console.log(`Uploading ${files.length} file(s) for message:`, messageText);
+          fileIds = await uploadFiles(files, abortController);
+          console.log('Files uploaded successfully. File IDs:', fileIds);
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            setIsGeneratingState(false);
+            return;
+          }
+          throw error;
+        }
+      }
+
+      // Step 3: Send message with file IDs
+      const requestBody = {
+        message: messageText,
+        model: model,
+        conversation_id: currentConversationId,
+        stream: true,
+        ...(fileIds.length > 0 && { file_ids: fileIds }),
+      };
+      
+      console.log('Sending message with request body:', {
+        message: messageText,
+        model: model,
+        conversation_id: currentConversationId,
+        file_ids: fileIds.length > 0 ? fileIds : 'none',
+        file_count: fileIds.length
+      });
+      
+      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: messageText,
-          model: selectedModel,
-          conversation_id: conversationId,
-          stream: true,
-        }),
-        signal: abortControllerRef.current.signal,
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+        if (response.status === 401 || errorData.detail === 'Authentication required') {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(errorData.detail || 'Failed to send message');
       }
 
       // Handle SSE streaming
@@ -305,21 +957,347 @@ export default function Chat() {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6));
-                if (data.content) {
-                  accumulatedContent += data.content;
-                  setMessages((prev) =>
+                // Handle chunk type - accumulate text
+                if (data.text && data.type === 'chunk') {
+                  accumulatedContent += data.text;
+                  setMessagesState((prev) =>
                     prev.map((msg) =>
                       msg.id === aiMessageId
-                        ? { ...msg, content: accumulatedContent }
+                        ? { ...msg, content: accumulatedContent, isGenerating: true }
                         : msg
                     )
                   );
                 }
+                // Handle complete type - use the full text
+                if (data.text && data.type === 'complete') {
+                  accumulatedContent = data.text;
+                  setMessagesState((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: accumulatedContent, isGenerating: false }
+                        : msg
+                    )
+                  );
+                  setIsGeneratingState(false);
+                }
+                // Handle done flag
+                if (data.done) {
+                  setMessagesState((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
+                    )
+                  );
+                  setIsGeneratingState(false);
+                }
+              } catch (e) {
+                // Skip invalid JSON
+                console.error('Error parsing SSE data:', e, line);
+              }
+            }
+          }
+        }
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was aborted - ensure state is cleaned up
+        setIsGeneratingState(false);
+        return;
+      }
+      console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Sorry, an error occurred. Please try again.';
+      
+      setMessagesState((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMessageId
+            ? { ...msg, content: errorMessage, isGenerating: false }
+            : msg
+        )
+      );
+      setIsGeneratingState(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim()) return;
+    
+    if (viewMode === 'double') {
+      // Send to both panels
+      if (isGenerating || isGenerating2) return;
+      
+      const messageText = inputValue.trim();
+      setInputValue('');
+      
+      // Abort previous requests if any
+      if (abortController1Ref.current) {
+        abortController1Ref.current.abort();
+      }
+      if (abortController2Ref.current) {
+        abortController2Ref.current.abort();
+      }
+      
+      const abortController1 = new AbortController();
+      const abortController2 = new AbortController();
+      abortController1Ref.current = abortController1;
+      abortController2Ref.current = abortController2;
+      
+      // Get files from filePreviews and clear immediately
+      const filesToUpload = filePreviews.map(preview => preview.file);
+      const imagePreviews = filePreviews.map(p => p.preview);
+      
+      // Clear file previews immediately when send is clicked
+      if (filePreviews.length > 0) {
+        // Don't revoke URLs yet - they're still needed for message display
+        setFilePreviews([]);
+      }
+      
+      // Send to panel 1
+      sendMessageToPanel(
+        1,
+        messageText,
+        selectedModel,
+        conversationId,
+        setConversationId,
+        setMessages,
+        setIsGenerating,
+        abortController1,
+        filesToUpload,
+        imagePreviews
+      ).finally(() => {
+        abortController1Ref.current = null;
+        // Revoke object URLs after message is sent
+        imagePreviews.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      });
+      
+      // Send to panel 2
+      if (isPanel2Open) {
+        sendMessageToPanel(
+          2,
+          messageText,
+          selectedModel2,
+          conversationId2,
+          setConversationId2,
+          setMessages2,
+          setIsGenerating2,
+          abortController2,
+          filesToUpload,
+          imagePreviews
+        ).finally(() => {
+          abortController2Ref.current = null;
+        });
+      }
+    } else {
+      // Single view - original logic
+      if (isGenerating) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: inputValue.trim(),
+      images: filePreviews.length > 0 ? filePreviews.map(p => p.preview) : undefined,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    const messageText = inputValue.trim();
+    setInputValue('');
+    setIsGenerating(true);
+
+    // Get files from filePreviews and clear immediately
+    const filesToUpload = filePreviews.map(preview => preview.file);
+    const imagePreviews = filePreviews.map(p => p.preview);
+    
+    // Clear file previews immediately when send is clicked
+    if (filePreviews.length > 0) {
+      // Don't revoke URLs yet - they're still needed for message display
+      setFilePreviews([]);
+    }
+    
+    // Store imagePreviews for later cleanup
+    const imagePreviewsForCleanup = [...imagePreviews];
+
+    // Create AI message placeholder
+    const aiMessageId = (Date.now() + 1).toString();
+    const aiMessage: Message = {
+      id: aiMessageId,
+      role: 'assistant',
+      content: '',
+      isGenerating: true,
+    };
+    setMessages((prev) => [...prev, aiMessage]);
+
+    // Abort previous request if any
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      // Get auth token from localStorage
+      const authToken = localStorage.getItem('authToken');
+      
+      if (!authToken || !authToken.trim()) {
+        throw new Error('Authentication required. Please login first.');
+      }
+      
+      const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken.trim()}`,
+      };
+
+      // Step 1: Create conversation if it doesn't exist
+      let currentConversationId = conversationId;
+      if (!currentConversationId) {
+        try {
+          const conversationResponse = await fetch(getApiUrl(API_ENDPOINTS.CONVERSATIONS.CREATE), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title: messageText.substring(0, 50) || 'New Conversation', // Use first 50 chars of message as title
+              model: selectedModel,
+            }),
+            signal: abortControllerRef.current.signal,
+          });
+
+          if (!conversationResponse.ok) {
+            const errorData = await conversationResponse.json().catch(() => ({ detail: 'Failed to create conversation' }));
+            // Handle validation errors (422)
+            if (conversationResponse.status === 422 && errorData.detail) {
+              const errorMsg = Array.isArray(errorData.detail) 
+                ? errorData.detail.map((e: { msg?: string; message?: string }) => e.msg || e.message).join(', ')
+                : errorData.detail;
+              throw new Error(`Validation error: ${errorMsg}`);
+            }
+            throw new Error(errorData.detail || errorData.message || 'Failed to create conversation');
+          }
+
+          const conversationData = await conversationResponse.json();
+          // Extract conversation_id from response structure: { code: 0, data: { id: "..." } }
+          currentConversationId = conversationData?.data?.id || conversationData?.id || conversationData?.conversation_id || conversationData?.data?.conversation_id || null;
+          
+          if (currentConversationId) {
+            setConversationId(currentConversationId);
+            console.log('Conversation created with ID:', currentConversationId);
+          } else {
+            console.warn('Conversation created but no ID found in response:', conversationData);
+            throw new Error('Failed to get conversation ID from response');
+          }
+        } catch (error) {
+          // Don't throw if request was aborted
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+          console.error('Error creating conversation:', error);
+          throw new Error('Failed to create conversation. Please try again.');
+        }
+      }
+
+      // Step 2: Upload files if any
+      let fileIds: string[] = [];
+      if (filesToUpload.length > 0) {
+        try {
+          console.log(`Uploading ${filesToUpload.length} file(s) for message:`, messageText);
+          fileIds = await uploadFiles(filesToUpload, abortControllerRef.current);
+          console.log('Files uploaded successfully. File IDs:', fileIds);
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            setIsGenerating(false);
+            return;
+          }
+          throw error;
+        }
+      }
+
+      // Step 3: Send message with file IDs
+      const requestBody = {
+        message: messageText,
+        model: selectedModel,
+        conversation_id: currentConversationId,
+        stream: true,
+        ...(fileIds.length > 0 && { file_ids: fileIds }),
+      };
+      
+      console.log('Sending message with request body:', {
+        message: messageText,
+        model: selectedModel,
+        conversation_id: currentConversationId,
+        file_ids: fileIds.length > 0 ? fileIds : 'none',
+        file_count: fileIds.length
+      });
+      
+      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: abortControllerRef.current.signal,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+        if (response.status === 401 || errorData.detail === 'Authentication required') {
+          // Clear invalid token and redirect to login
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error(errorData.detail || 'Failed to send message');
+      }
+
+      // Handle SSE streaming
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let accumulatedContent = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                // Handle chunk type - accumulate text
+                if (data.text && data.type === 'chunk') {
+                  accumulatedContent += data.text;
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: accumulatedContent, isGenerating: true }
+                        : msg
+                    )
+                  );
+                }
+                // Handle complete type - use the full text
+                if (data.text && data.type === 'complete') {
+                  accumulatedContent = data.text;
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: accumulatedContent, isGenerating: false }
+                        : msg
+                    )
+                  );
+                  setIsGenerating(false);
+                }
+                // Handle done flag
+                if (data.done) {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
+                    )
+                  );
+                  setIsGenerating(false);
+                }
                 if (data.conversation_id) {
                   setConversationId(data.conversation_id);
                 }
-              } catch {
+              } catch (e) {
                 // Skip invalid JSON
+                console.error('Error parsing SSE data:', e, line);
               }
             }
           }
@@ -331,32 +1309,71 @@ export default function Chat() {
           msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
         )
       );
+      
+      // Revoke object URLs after message is sent
+      if (imagePreviewsForCleanup.length > 0) {
+        imagePreviewsForCleanup.forEach((url) => {
+          URL.revokeObjectURL(url);
+        });
+      }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         // Request was aborted
         return;
       }
       console.error('Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Sorry, an error occurred. Please try again.';
+      
+      // If authentication error, show specific message
+      if (errorMessage.includes('Authentication') || errorMessage.includes('Session expired')) {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMessageId
-            ? { ...msg, content: 'Sorry, an error occurred. Please try again.', isGenerating: false }
+              ? { ...msg, content: errorMessage, isGenerating: false }
             : msg
         )
       );
+        // Optionally redirect to login after a delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, content: errorMessage, isGenerating: false }
+              : msg
+          )
+        );
+      }
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
     }
+    }
   };
 
   const handleStopGenerating = () => {
+    // Abort single view controller
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    // Abort double view controllers
+    if (abortController1Ref.current) {
+      abortController1Ref.current.abort();
+      abortController1Ref.current = null;
+    }
+    if (abortController2Ref.current) {
+      abortController2Ref.current.abort();
+      abortController2Ref.current = null;
+    }
     setIsGenerating(false);
+    setIsGenerating2(false);
     setMessages((prev) =>
+      prev.map((msg) => (msg.isGenerating ? { ...msg, isGenerating: false } : msg))
+    );
+    setMessages2((prev) =>
       prev.map((msg) => (msg.isGenerating ? { ...msg, isGenerating: false } : msg))
     );
   };
@@ -642,6 +1659,357 @@ export default function Chat() {
         </header>
 
         {/* Chat */}
+        {viewMode === 'double' ? (
+          <div className="flex-1 flex overflow-hidden">
+            {/* Panel 1 */}
+            <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700 relative">
+              {/* Panel Header */}
+              <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-3 h-3 text-white" />
+                  </div>
+                  <div ref={modelDropdownRef} className="relative">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
+                    >
+                      {selectedModel}
+                      {isModelDropdownOpen ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </motion.button>
+                    {/* Model Dropdown for Panel 1 */}
+                    {isModelDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
+                      >
+                        <div className="p-2">
+                          <div className="mb-4">
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Basic
+                            </div>
+                            {availableModels
+                              .filter((model) => model.category === 'basic')
+                              .map((model) => {
+                                const isSelected = selectedModel === model.name;
+                                return (
+                                  <motion.button
+                                    key={model.id}
+                                    onClick={() => {
+                                      setSelectedModel(model.name);
+                                      setIsModelDropdownOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                      isSelected
+                                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                                  >
+                                    <div className={`flex-shrink-0 ${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                      {getModelIcon(model.id)}
+                                    </div>
+                                    <span className="text-sm font-medium flex-1">{model.name}</span>
+                                    {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                  </motion.button>
+                                );
+                              })}
+                          </div>
+                          <div className="mb-4">
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Advanced
+                            </div>
+                            {availableModels
+                              .filter((model) => model.category === 'advanced')
+                              .map((model) => {
+                                const isSelected = selectedModel === model.name;
+                                return (
+                                  <motion.button
+                                    key={model.id}
+                                    onClick={() => {
+                                      setSelectedModel(model.name);
+                                      setIsModelDropdownOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                      isSelected
+                                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                    }`}
+                                  >
+                                    <div className={`flex-shrink-0 ${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                      {getModelIcon(model.id)}
+                                    </div>
+                                    <span className="text-sm font-medium flex-1">{model.name}</span>
+                                    {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                  </motion.button>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setViewMode('single')}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </motion.button>
+              </div>
+              {/* Panel 1 Messages */}
+              <div className="flex-1 overflow-y-auto p-4">
+                {messages.length === 0 ? (
+                  <div className="text-center pt-12">
+                    <motion.h2
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                    >
+                      Hi,
+                    </motion.h2>
+                    <p className="text-lg text-gray-600 dark:text-gray-400">
+                      How can I assist you today?
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        {message.role === 'assistant' ? (
+                          <div className="flex items-start gap-2 max-w-[85%]">
+                            <div className="w-6 h-6 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
+                              <Sparkles className="w-3 h-3 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                {selectedModel}
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm">
+                                {message.content}
+                                {message.isGenerating && (
+                                  <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full ml-1 animate-pulse" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
+                            {message.images && message.images.length > 0 && (
+                              <div className="mb-2 flex flex-wrap gap-2">
+                                {message.images.map((imageUrl, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={imageUrl}
+                                    alt={`Uploaded image ${idx + 1}`}
+                                    className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
+                                    onClick={() => handleImageClick(idx)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {message.content && (
+                              <p className="text-gray-900 dark:text-white">{message.content}</p>
+                            )}
+                          </div>
+                        )}
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Panel 2 - GPT-5 mini */}
+            {isPanel2Open && (
+              <div className="flex-1 flex flex-col relative">
+                {/* Panel Header */}
+                <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-3 h-3 text-white" />
+                    </div>
+                    <div className="relative">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setIsModelDropdownOpen2(!isModelDropdownOpen2)}
+                        className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
+                      >
+                        {selectedModel2}
+                        {isModelDropdownOpen2 ? (
+                          <ChevronUp className="w-3 h-3" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3" />
+                        )}
+                      </motion.button>
+                      {/* Model Dropdown for Panel 2 */}
+                      {isModelDropdownOpen2 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
+                        >
+                          <div className="p-2">
+                            <div className="mb-4">
+                              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Basic
+                              </div>
+                              {availableModels
+                                .filter((model) => model.category === 'basic')
+                                .map((model) => {
+                                  const isSelected = selectedModel2 === model.name;
+                                  return (
+                                    <motion.button
+                                      key={model.id}
+                                      onClick={() => {
+                                        setSelectedModel2(model.name);
+                                        setIsModelDropdownOpen2(false);
+                                      }}
+                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                        isSelected
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                      }`}
+                                    >
+                                      <div className={`flex-shrink-0 ${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        {getModelIcon(model.id)}
+                                      </div>
+                                      <span className="text-sm font-medium flex-1">{model.name}</span>
+                                      {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                    </motion.button>
+                                  );
+                                })}
+                            </div>
+                            <div className="mb-4">
+                              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                Advanced
+                              </div>
+                              {availableModels
+                                .filter((model) => model.category === 'advanced')
+                                .map((model) => {
+                                  const isSelected = selectedModel2 === model.name;
+                                  return (
+                                    <motion.button
+                                      key={model.id}
+                                      onClick={() => {
+                                        setSelectedModel2(model.name);
+                                        setIsModelDropdownOpen2(false);
+                                      }}
+                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                        isSelected
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                      }`}
+                                    >
+                                      <div className={`flex-shrink-0 ${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        {getModelIcon(model.id)}
+                                      </div>
+                                      <span className="text-sm font-medium flex-1">{model.name}</span>
+                                      {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                    </motion.button>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setIsPanel2Open(false)}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </motion.button>
+                </div>
+                {/* Panel 2 Messages */}
+                <div className="flex-1 overflow-y-auto p-4">
+                  {messages2.length === 0 ? (
+                    <div className="text-center pt-12">
+                      <motion.h2
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                      >
+                        Hi,
+                      </motion.h2>
+                      <p className="text-lg text-gray-600 dark:text-gray-400">
+                        How can I assist you today?
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages2.map((message) => (
+                        <motion.div
+                          key={message.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {message.role === 'assistant' ? (
+                            <div className="flex items-start gap-2 max-w-[85%]">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0">
+                                <Sparkles className="w-3 h-3 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                  {selectedModel2}
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm">
+                                  {message.content}
+                                  {message.isGenerating && (
+                                    <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full ml-1 animate-pulse" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
+                              {message.images && message.images.length > 0 && (
+                                <div className="mb-2 flex flex-wrap gap-2">
+                                  {message.images.map((imageUrl, idx) => (
+                                    <img
+                                      key={idx}
+                                      src={imageUrl}
+                                      alt={`Uploaded image ${idx + 1}`}
+                                      className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
+                                      onClick={() => handleImageClick(idx)}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                              {message.content && (
+                                <p className="text-gray-900 dark:text-white">{message.content}</p>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
         <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-8">
           <div className="max-w-4xl mx-auto">
             {messages.length === 0 ? (
@@ -694,7 +2062,7 @@ export default function Chat() {
                         </div>
                         <div className="flex-1">
                           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                            Sider Fusion
+                            {selectedModel}
                           </div>
                           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-gray-900 dark:text-white shadow-sm">
                             {message.content}
@@ -706,7 +2074,22 @@ export default function Chat() {
                       </div>
                     ) : (
                       <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-3 max-w-[80%]">
-                        <p className="text-gray-900 dark:text-white">{message.content}</p>
+                        {message.images && message.images.length > 0 && (
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            {message.images.map((imageUrl, idx) => (
+                              <img
+                                key={idx}
+                                src={imageUrl}
+                                alt={`Uploaded image ${idx + 1}`}
+                                className="max-w-[200px] max-h-[200px] rounded-lg object-contain cursor-pointer"
+                                onClick={() => handleImageClick(idx)}
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {message.content && (
+                          <p className="text-gray-900 dark:text-white">{message.content}</p>
+                        )}
                       </div>
                     )}
                   </motion.div>
@@ -729,24 +2112,36 @@ export default function Chat() {
             )}
           </div>
         </div>
+        )}
 
         {/* Input */}
         <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
           <div className="max-w-4xl mx-auto">
+            {/* All buttons in one line */}
             <div className="flex items-center gap-2 mb-3">
-              <div ref={modelDropdownRef} className="relative">
+              {viewMode === 'single' && (
+              <div ref={modelDropdownRef} className="relative group">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium text-sm flex items-center gap-2 hover:from-indigo-700 hover:to-purple-700 transition-colors"
+                    className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
                 >
-                  <div className="w-4 h-4 rounded-full bg-white flex items-center justify-center">
-                    <Sparkles className="w-3 h-3 text-purple-600" />
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-3 h-3 text-white" />
                   </div>
                   {selectedModel}
+                  {isModelDropdownOpen ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
                   <ChevronDown className="w-4 h-4" />
+                  )}
                 </motion.button>
+                {/* Tooltip for Model Button */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Switch model
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
 
                 {/* Model Dropdown */}
                 {isModelDropdownOpen && (
@@ -754,51 +2149,812 @@ export default function Chat() {
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
+                    className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
                   >
-                    {availableModels.length > 0 ? (
                       <div className="p-2">
-                        {availableModels.map((model) => (
+                      {/* Basic Models Section */}
+                      <div className="mb-4">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Basic
+                        </div>
+                        {availableModels
+                          .filter((model) => model.category === 'basic')
+                          .map((model) => {
+                            const isSelected = selectedModel === model.name;
+                            return (
                           <motion.button
                             key={model.id}
                             onClick={() => {
-                              setSelectedModel(model.name || model.id);
+                                  setSelectedModel(model.name);
                               setIsModelDropdownOpen(false);
                             }}
-                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                              selectedModel === (model.name || model.id)
-                                ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                  isSelected
+                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                                 : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                             }`}
                           >
-                            <span className="text-sm font-medium">
-                              {model.name || model.id}
+                                <div
+                                  className={`flex-shrink-0 ${
+                                    isSelected
+                                      ? 'text-purple-600 dark:text-purple-400'
+                                      : 'text-gray-500 dark:text-gray-400'
+                                  }`}
+                                >
+                                  {getModelIcon(model.id)}
+                                </div>
+                                <span className="text-sm font-medium flex-1">
+                                  {model.name}
                             </span>
+                                {isSelected && (
+                                  <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                )}
                           </motion.button>
-                        ))}
+                            );
+                          })}
                       </div>
-                    ) : (
-                      <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-                        No models available
+
+                      {/* Advanced Models Section */}
+                      <div className="mb-4">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Advanced
                       </div>
-                    )}
+                        {availableModels
+                          .filter((model) => model.category === 'advanced')
+                          .map((model) => {
+                            const isSelected = selectedModel === model.name;
+                            return (
+                              <motion.button
+                                key={model.id}
+                                onClick={() => {
+                                  setSelectedModel(model.name);
+                                  setIsModelDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                  isSelected
+                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                <div
+                                  className={`flex-shrink-0 ${
+                                    isSelected
+                                      ? 'text-purple-600 dark:text-purple-400'
+                                      : 'text-gray-500 dark:text-gray-400'
+                                  }`}
+                                >
+                                  {getModelIcon(model.id)}
+                                </div>
+                                <span className="text-sm font-medium flex-1">
+                                  {model.name}
+                                </span>
+                                {isSelected && (
+                                  <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                )}
+                              </motion.button>
+                            );
+                          })}
+                      </div>
+
+                      {/* Other Models Option */}
+                      <div className="relative">
+                        <motion.button
+                          ref={otherModelsRef}
+                          onMouseEnter={() => setIsOtherModelsHovered(true)}
+                          onMouseLeave={() => setIsOtherModelsHovered(false)}
+                          onClick={() => {
+                            setIsModelDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          <span className="text-sm font-medium">... Other Models</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </motion.button>
+
+                        {/* Other Models Hover Dropdown */}
+                        {isOtherModelsHovered && (
+                          <motion.div
+                            ref={otherModelsDropdownRef}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -10 }}
+                            onMouseEnter={() => setIsOtherModelsHovered(true)}
+                            onMouseLeave={() => setIsOtherModelsHovered(false)}
+                            className="absolute left-full top-0 ml-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-96 overflow-y-auto"
+                          >
+                            <div className="p-2">
+                              {/* Show currently selected model at top if it's an advanced model */}
+                              {availableModels
+                                .filter((m) => m.category === 'advanced' && selectedModel === m.name)
+                                .map((model) => {
+                                  const isSelected = selectedModel === model.name;
+                                  return (
+                                    <motion.button
+                                      key={model.id}
+                                      onClick={() => {
+                                        setSelectedModel(model.name);
+                                        setIsModelDropdownOpen(false);
+                                        setIsOtherModelsHovered(false);
+                                      }}
+                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors mb-2 ${
+                                        isSelected
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                      }`}
+                                    >
+                                      <div
+                                        className={`flex-shrink-0 ${
+                                          isSelected
+                                            ? 'text-purple-600 dark:text-purple-400'
+                                            : 'text-gray-500 dark:text-gray-400'
+                                        }`}
+                                      >
+                                        {getModelIcon(model.id)}
+                                      </div>
+                                      <span className="text-sm font-medium flex-1">
+                                        {model.name}
+                                      </span>
+                                      {isSelected && (
+                                        <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                      )}
+                                    </motion.button>
+                                  );
+                                })}
+
+                              {/* Advanced Models Section */}
+                              <div className="mb-2">
+                                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                  Advanced
+                                </div>
+                                {availableModels
+                                  .filter((model) => model.category === 'advanced')
+                                  .map((model) => {
+                                    const isSelected = selectedModel === model.name;
+                                    return (
+                                      <motion.button
+                                        key={model.id}
+                                        onClick={() => {
+                                          setSelectedModel(model.name);
+                                          setIsModelDropdownOpen(false);
+                                          setIsOtherModelsHovered(false);
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                          isSelected
+                                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                      >
+                                        <div
+                                          className={`flex-shrink-0 ${
+                                            isSelected
+                                              ? 'text-purple-600 dark:text-purple-400'
+                                              : 'text-gray-500 dark:text-gray-400'
+                                          }`}
+                                        >
+                                          {getModelIcon(model.id)}
+                                        </div>
+                                        <span className="text-sm font-medium flex-1">
+                                          {model.name}
+                                        </span>
+                                        {isSelected && (
+                                          <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                        )}
+                                      </motion.button>
+                                    );
+                                  })}
+                              </div>
+
+                              {/* Additional Other Models */}
+                              {OTHER_MODELS.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                  {OTHER_MODELS.map((model) => {
+                                    const isSelected = selectedModel === model.name;
+                                    return (
+                                      <motion.button
+                                        key={model.id}
+                                        onClick={() => {
+                                          setSelectedModel(model.name);
+                                          setIsModelDropdownOpen(false);
+                                          setIsOtherModelsHovered(false);
+                                        }}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                                          isSelected
+                                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                      >
+                                        <div
+                                          className={`flex-shrink-0 ${
+                                            isSelected
+                                              ? 'text-purple-600 dark:text-purple-400'
+                                              : 'text-gray-500 dark:text-gray-400'
+                                          }`}
+                                        >
+                                          {getModelIcon(model.id)}
+                                        </div>
+                                        <span className="text-sm font-medium flex-1">
+                                          {model.name}
+                                        </span>
+                                        {model.id === 'claude-opus-4.1' && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
+                                            <Star className="w-3 h-3 text-purple-500" />
+                                          </div>
+                                        )}
+                                      </motion.button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                   </motion.div>
                 )}
               </div>
-              {[FileText, Split, Paperclip].map((Icon, i) => (
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+              )}
+              
+              {/* View Mode Buttons and Attachment - Always visible, in one line */}
+              {/* Single View Button */}
+              <div className="relative group">
                 <motion.button
-                  key={i}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setViewMode('single')}
+                  className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${
+                    viewMode === 'single'
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
                 >
-                  <Icon className="w-5 h-5" />
+                  <Square className="w-5 h-5 stroke-2" />
                 </motion.button>
-              ))}
+                {/* Tooltip for Single View */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Single view
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+              </div>
+              
+              {/* Double View Button */}
+              <div className="relative group">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setViewMode('double');
+                    setIsPanel2Open(true);
+                  }}
+                  className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${
+                    viewMode === 'double'
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <div className="w-5 h-5 flex items-center gap-0.5">
+                    <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
+                    <div className="w-px h-full bg-gray-300 dark:bg-gray-500" />
+                    <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
+                  </div>
+                </motion.button>
+                {/* Tooltip for Double View */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Double view
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+              </div>
+            
+              {/* Attachment Button */}
+              <div className="relative flex items-center group">
+                <motion.button
+                  ref={attachmentButtonRef}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleAttachmentClick}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </motion.button>
+                
+                {/* Tooltip for Attachment */}
+                <div className="absolute bottom-full left-0 mb-2 w-80 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 p-3">
+                  <div className="space-y-1">
+                    <div>
+                      <span className="font-semibold">Support:</span> Webpage, PDF, DOC, XLSX, CSV, JPG, JSON, MP3, WAV, M4A, MPGA, and more
+                    </div>
+                    <div>
+                      <span className="font-semibold">Limit:</span> Up to 6 files, 100MB each
+                    </div>
+                  </div>
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+
+                {/* Attachment Dropdown */}
+                {isAttachmentDropdownOpen && (
+                  <motion.div
+                    ref={attachmentDropdownRef}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                  >
+                    <div className="p-2">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleFileSelect}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        <Upload className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm font-medium">Upload from your computer</span>
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Chat Controls Button */}
+              <div className="relative flex items-center group" style={{ marginLeft: '47%' }}>
+                <motion.button
+                  ref={chatControlsButtonRef}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsChatControlsOpen(!isChatControlsOpen)}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <Sliders className="w-5 h-5" />
+                </motion.button>
+                {/* Tooltip for Chat Controls */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Chat controls
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+                
+                {/* Chat Controls Dropdown */}
+                {isChatControlsOpen && (
+                  <motion.div
+                    ref={chatControlsRef}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute bottom-full right-0 mb-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                  >
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Chat controls</h3>
+                      
+                      {/* Capabilities Section */}
+                      <div className="mb-6">
+                        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Capabilities</h4>
+                        
+                        {/* Artifacts */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
+                              <FolderPlus className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Artifacts</span>
+                          </div>
+                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                          </div>
+                        </div>
+                        
+                        {/* Search */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                              <Globe className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
+                          </div>
+                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                          </div>
+                        </div>
+                        
+                        {/* Image */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center">
+                              <ImageIcon className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Image</span>
+                          </div>
+                          <div className="flex items-center gap-2 relative">
+                            <div className="relative">
+                              <motion.button
+                                ref={imageModelButtonRef}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setIsImageModelDropdownOpen(!isImageModelDropdownOpen)}
+                                className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              >
+                                {selectedImageModel}
+                                <ChevronDown className="w-3 h-3" />
+                              </motion.button>
+                              
+                              {/* Image Model Dropdown */}
+                              {isImageModelDropdownOpen && (
+                                <motion.div
+                                  ref={imageModelDropdownRef}
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
+                                >
+                                  <div className="p-2">
+                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 py-1 mb-1">
+                                      Select Generation Model
+                                    </div>
+                                    {[
+                                      { name: 'Nano Banana', description: 'Gemini 2.5 Flash Image Preview', credits: '5', icon: Sparkles, color: 'text-purple-500' },
+                                      { name: 'Low', description: 'GPT-image-1', credits: '10', icon: Zap, color: 'text-green-500' },
+                                      { name: 'Medium', description: 'GPT-image-1', credits: '5', icon: Sparkles, color: 'text-purple-500' },
+                                      { name: 'High', description: 'GPT-image-1', credits: '20', icon: Sparkles, color: 'text-purple-500' },
+                                    ].map((model) => {
+                                      const IconComponent = model.icon;
+                                      return (
+                                        <motion.button
+                                          key={model.name}
+                                          whileHover={{ scale: 1.02 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          onClick={() => {
+                                            setSelectedImageModel(model.name);
+                                            setIsImageModelDropdownOpen(false);
+                                          }}
+                                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors mb-1 ${
+                                            selectedImageModel === model.name
+                                              ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
+                                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-3 flex-1">
+                                            <IconComponent className={`w-4 h-4 ${model.color}`} />
+                                            <div className="flex-1">
+                                              <div className="text-sm font-medium">{model.name}</div>
+                                              <div className="text-xs text-gray-500 dark:text-gray-400">{model.description}</div>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{model.credits}</span>
+                                            <Sparkles className="w-3 h-3 text-purple-500" />
+                                          </div>
+                                        </motion.button>
+                                      );
+                                    })}
+                                  </div>
+                                </motion.div>
+                              )}
+                            </div>
+                            <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                              <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Data Analysis */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                              <BarChart3 className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Data Analysis</span>
+                          </div>
+                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                          </div>
+                        </div>
+                        
+                        {/* Think (R1) */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center">
+                              <Brain className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Think (R1)</span>
+                          </div>
+                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Personalization Section */}
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Personalization</h4>
+                        
+                        {/* Custom Instructions */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                              <FileText className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Custom Instructions</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Edit className="w-4 h-4 text-gray-500 dark:text-gray-400 cursor-pointer" />
+                            <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                              <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Response language */}
+                        <div className="flex items-center justify-between py-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                              <Languages className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">Response language</span>
+                          </div>
+                          <div className="relative">
+                            <motion.button
+                              ref={languageButtonRef}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                              className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            >
+                              {selectedLanguage}
+                              <ChevronUp className="w-3 h-3" />
+                            </motion.button>
+                            
+                            {/* Language Dropdown */}
+                            {isLanguageDropdownOpen && (
+                              <motion.div
+                                ref={languageDropdownRef}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                className="absolute bottom-full right-0 mb-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
+                              >
+                                {/* Search Bar */}
+                                <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                                  <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                      type="text"
+                                      value={languageSearch}
+                                      onChange={(e) => setLanguageSearch(e.target.value)}
+                                      placeholder="Search"
+                                      className="w-full pl-8 pr-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Language List */}
+                                <div className="max-h-64 overflow-y-auto">
+                                  {[
+                                    { name: 'Auto', nativeName: '' },
+                                    { name: 'English', nativeName: 'English' },
+                                    { name: 'Simplified Chinese', nativeName: '中文(简体)' },
+                                    { name: 'Traditional Chinese', nativeName: '中文(繁體)' },
+                                    { name: 'Spanish', nativeName: 'Español' },
+                                    { name: 'French', nativeName: 'Français' },
+                                    { name: 'German', nativeName: 'Deutsch' },
+                                    { name: 'Italian', nativeName: 'Italiano' },
+                                    { name: 'Portuguese', nativeName: 'Português' },
+                                    { name: 'Russian', nativeName: 'Русский' },
+                                    { name: 'Japanese', nativeName: '日本語' },
+                                    { name: 'Korean', nativeName: '한국어' },
+                                    { name: 'Arabic', nativeName: 'العربية' },
+                                    { name: 'Hindi', nativeName: 'हिन्दी' },
+                                    { name: 'Dutch', nativeName: 'Nederlands' },
+                                    { name: 'Polish', nativeName: 'Polski' },
+                                    { name: 'Turkish', nativeName: 'Türkçe' },
+                                    { name: 'Vietnamese', nativeName: 'Tiếng Việt' },
+                                    { name: 'Thai', nativeName: 'ไทย' },
+                                    { name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
+                                    { name: 'Swedish', nativeName: 'Svenska' },
+                                    { name: 'Norwegian', nativeName: 'Norsk' },
+                                    { name: 'Danish', nativeName: 'Dansk' },
+                                    { name: 'Finnish', nativeName: 'Suomi' },
+                                    { name: 'Greek', nativeName: 'Ελληνικά' },
+                                    { name: 'Hebrew', nativeName: 'עברית' },
+                                    { name: 'Czech', nativeName: 'Čeština' },
+                                    { name: 'Romanian', nativeName: 'Română' },
+                                    { name: 'Hungarian', nativeName: 'Magyar' },
+                                  ]
+                                    .filter((lang) => {
+                                      if (!languageSearch.trim()) return true;
+                                      const searchLower = languageSearch.toLowerCase();
+                                      return (
+                                        lang.name.toLowerCase().includes(searchLower) ||
+                                        lang.nativeName.toLowerCase().includes(searchLower)
+                                      );
+                                    })
+                                    .map((lang) => (
+                                      <motion.button
+                                        key={lang.name}
+                                        whileHover={{ scale: 1.01 }}
+                                        whileTap={{ scale: 0.99 }}
+                                        onClick={() => {
+                                          setSelectedLanguage(lang.name);
+                                          setIsLanguageDropdownOpen(false);
+                                          setLanguageSearch('');
+                                        }}
+                                        className={`w-full flex flex-col items-start px-3 py-2.5 text-left transition-colors ${
+                                          selectedLanguage === lang.name
+                                            ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                      >
+                                        <div className="text-sm font-medium">{lang.name}</div>
+                                        {lang.nativeName && (
+                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                            {lang.nativeName}
+                                          </div>
+                                        )}
+                                      </motion.button>
+                                    ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Chat History Button */}
+              <div className="relative flex items-center group">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsChatHistoryOpen(!isChatHistoryOpen)}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <History className="w-5 h-5" />
+                </motion.button>
+                {/* Tooltip for Chat History */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  Chat history
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+              </div>
+
+              {/* New Chat Button */}
+              <div className="relative flex items-center group">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleNewChat}
+                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  <Plus className="w-5 h-5 text-purple-500" />
+                </motion.button>
+                {/* Tooltip for New Chat */}
+                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                  New chat
+                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                </div>
+              </div>
             </div>
 
-             <div className="relative bg-gray-50 dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="relative bg-gray-50 dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 min-h-[200px]">
+              {/* File Previews */}
+              {filePreviews.length > 0 && (
+                <div className="mb-4">
+                  {/* All Images in One Section */}
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {filePreviews.map((preview, index) => {
+                      console.log(`Rendering preview ${index}:`, preview.file.name, preview.preview);
+                      return (
+                        <div
+                          key={`${preview.file.name}-${index}`}
+                          className="relative rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-center items-center"
+                          style={{ width: '14%', minWidth: '80px', height: '128px' }}
+                        >
+                          <img
+                            src={preview.preview}
+                            alt={preview.file.name}
+                            className="max-h-32 w-auto object-contain cursor-pointer"
+                            onClick={() => handleImageClick(index)}
+                            onError={() => {
+                              console.error('Image failed to load:', preview.preview, preview.file.name);
+                            }}
+                            onLoad={() => {
+                              console.log('Image loaded successfully:', preview.file.name);
+                            }}
+                          />
+                          <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleRemoveFile(index)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
+                            title="Remove"
+                          >
+                            <X className="w-3 h-3" />
+                          </motion.button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action Buttons - Shared for all images */}
+                  <div className="flex items-center justify-between gap-2">
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleExtractText()}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                    >
+                      <FileText className="w-4 h-4 text-indigo-500" />
+                      Extract Text
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleMathSolver()}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                    >
+                      <Calculator className="w-4 h-4 text-green-500" />
+                      Math Solver
+                    </motion.button>
+
+                    <div className="relative flex-1">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() =>
+                          setIsTranslateDropdownOpen(
+                            isTranslateDropdownOpen === null ? 0 : null
+                          )
+                        }
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                      >
+                        <Languages className="w-4 h-4 text-blue-500" />
+                        Translate
+                        <ChevronDownIcon className="w-3 h-3" />
+                      </motion.button>
+
+                      {/* Translate Dropdown */}
+                      {isTranslateDropdownOpen !== null && (
+                        <motion.div
+                          ref={translateDropdownRef}
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
+                        >
+                          <div className="p-1">
+                            {languages.map((lang) => (
+                              <motion.button
+                                key={lang.code}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() =>
+                                  handleTranslate(lang.code, lang.name)
+                                }
+                                className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                              >
+                                {lang.name}
+                              </motion.button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </div>
+                    
+                  </div>
+                </div>
+              )}
+
                <div className="flex items-end gap-2">
+                {/* Hidden File Input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+
                  <input
                    type="text"
                    value={inputValue}
@@ -830,10 +2986,14 @@ export default function Chat() {
                      whileHover={{ scale: 1.1 }}
                      whileTap={{ scale: 0.9 }}
                      onClick={handleSendMessage}
-                     disabled={!inputValue.trim() || isGenerating}
+                    disabled={!inputValue.trim() || (viewMode === 'single' ? isGenerating : isGenerating || isGenerating2)}
                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                    >
+                    {inputValue.trim() ? (
+                      <Send className="w-5 h-5" />
+                    ) : (
                      <Mic className="w-5 h-5" />
+                    )}
                    </motion.button>
                  </div>
                </div>
@@ -848,6 +3008,317 @@ export default function Chat() {
         onClose={() => setIsUserProfileOpen(false)}
         position={userProfilePosition}
       />
+
+      {/* Image Modal */}
+      {selectedImageIndex !== null && filePreviews[selectedImageIndex] && (
+        <motion.div
+          ref={imageModalRef}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className={`fixed inset-0 bg-black/80 z-[100] flex items-center justify-center ${
+            isImageMinimized ? 'items-end' : ''
+          }`}
+          onClick={(e) => {
+            if (e.target === imageModalRef.current) {
+              handleCloseImageModal();
+            }
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ 
+              scale: isImageMinimized ? 0.3 : isImageMaximized ? 1 : 1,
+              opacity: 1,
+              width: isImageMinimized ? '300px' : isImageMaximized ? '95vw' : '80vw',
+              height: isImageMinimized ? '200px' : isImageMaximized ? '95vh' : '80vh',
+            }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden ${
+              isImageMinimized ? 'mb-4' : ''
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4 z-10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-white text-sm font-medium">
+                  {filePreviews[selectedImageIndex].file.name}
+                </span>
+                <span className="text-white/70 text-xs">
+                  {Math.round(imageZoom * 100)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Zoom Controls */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleZoomOut}
+                  disabled={imageZoom <= 0.5}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Zoom Out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleZoomIn}
+                  disabled={imageZoom >= 5}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Zoom In"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </motion.button>
+                {/* Minimize Button */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    setIsImageMinimized(!isImageMinimized);
+                    if (isImageMaximized) setIsImageMaximized(false);
+                  }}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                  title={isImageMinimized ? "Restore" : "Minimize"}
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </motion.button>
+                {/* Maximize Button */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    setIsImageMaximized(!isImageMaximized);
+                    if (isImageMinimized) setIsImageMinimized(false);
+                  }}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                  title={isImageMaximized ? "Restore" : "Maximize"}
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </motion.button>
+                {/* Close Button */}
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleCloseImageModal}
+                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Image Container */}
+            <div className="w-full h-full flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 p-4">
+              <motion.img
+                src={filePreviews[selectedImageIndex].preview}
+                alt={filePreviews[selectedImageIndex].file.name}
+                style={{ 
+                  transform: `scale(${imageZoom})`,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                }}
+                className="transition-transform duration-200"
+                draggable={false}
+              />
+            </div>
+
+            {/* Navigation Arrows (if multiple images) */}
+            {filePreviews.length > 1 && (
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    const prevIndex = selectedImageIndex > 0 ? selectedImageIndex - 1 : filePreviews.length - 1;
+                    setSelectedImageIndex(prevIndex);
+                    setImageZoom(1);
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
+                  title="Previous Image"
+                >
+                  <ChevronRight className="w-5 h-5 rotate-180" />
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    const nextIndex = selectedImageIndex < filePreviews.length - 1 ? selectedImageIndex + 1 : 0;
+                    setSelectedImageIndex(nextIndex);
+                    setImageZoom(1);
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
+                  title="Next Image"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </motion.button>
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Chat History Sidebar */}
+      {isChatHistoryOpen && (
+        <motion.div
+          ref={chatHistoryRef}
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          className="fixed top-0 right-0 h-full w-96 bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 shadow-2xl z-[90] flex flex-col"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Chat history</h2>
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsChatHistoryOpen(false)}
+              className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </motion.button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center border-b border-gray-200 dark:border-gray-700 px-4">
+            <button
+              onClick={() => setChatHistoryTab('all')}
+              className={`px-4 py-3 text-sm font-medium transition-colors relative ${
+                chatHistoryTab === 'all'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              All
+              {chatHistoryTab === 'all' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setChatHistoryTab('starred')}
+              className={`px-4 py-3 text-sm font-medium transition-colors relative flex items-center gap-2 ${
+                chatHistoryTab === 'starred'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              Starred
+              {chatHistoryTab === 'starred' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-900 dark:bg-white"></div>
+              )}
+              <Trash2 className="w-4 h-4 ml-auto" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={chatHistorySearch}
+                onChange={(e) => setChatHistorySearch(e.target.value)}
+                placeholder="Search"
+                className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+
+          {/* Chat History List */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {getFilteredChatHistory().length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center">
+                <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                  <History className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500 dark:text-gray-400">No history yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(
+                  getFilteredChatHistory().reduce((acc, chat) => {
+                    const dateLabel = formatChatDate(chat.timestamp);
+                    if (!acc[dateLabel]) {
+                      acc[dateLabel] = [];
+                    }
+                    acc[dateLabel].push(chat);
+                    return acc;
+                  }, {} as Record<string, ChatHistoryItem[]>)
+                ).map(([dateLabel, chats]) => (
+                  <div key={dateLabel}>
+                    <h3 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                      {dateLabel}
+                    </h3>
+                    {chats.map((chat) => (
+                      <motion.div
+                        key={chat.id}
+                        whileHover={{ scale: 1.02 }}
+                        className="group p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer mb-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate mb-1">
+                              {chat.title}
+                            </h4>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                              {chat.preview}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStarChat(chat.id);
+                              }}
+                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                            >
+                              <Star
+                                className={`w-4 h-4 ${
+                                  chat.starred
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-400'
+                                }`}
+                              />
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteChat(chat.id);
+                              }}
+                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                            >
+                              <Trash2 className="w-4 h-4 text-gray-400" />
+                            </motion.button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Chat History Overlay */}
+      {isChatHistoryOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsChatHistoryOpen(false)}
+          className="fixed inset-0 bg-black/50 z-[80]"
+        />
+      )}
     </div>
   );
 }
