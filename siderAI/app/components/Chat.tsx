@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   MessageCircle,
@@ -52,6 +53,9 @@ import {
   Sliders,
 } from 'lucide-react';
 import UserProfileDropdown from './UserProfileDropdown';
+import DeepResearch from './DeepResearch';
+import ScholarResearch from './ScholarResearch';
+import WebCreator from './WebCreator';
 import { getApiUrl, API_ENDPOINTS } from '../lib/apiConfig';
 
 interface DropdownPosition {
@@ -132,8 +136,38 @@ interface UserData {
   username?: string;
 }
 
+// Helper function to get initial activeView from pathname
+const getInitialActiveView = (pathname: string | null): 'chat' | 'deep-research' | 'scholar-research' | 'web-creator' | 'ai-writer' | 'ai-slides' => {
+  if (!pathname) return 'chat';
+  if (pathname.startsWith('/wisebase/scholar-research')) return 'scholar-research';
+  if (pathname.startsWith('/wisebase/deep-research')) return 'deep-research';
+  if (pathname.startsWith('/agents/web-creator')) return 'web-creator';
+  if (pathname.startsWith('/agents/ai-writer')) return 'ai-writer';
+  if (pathname.startsWith('/agents/ai-slides')) return 'ai-slides';
+  return 'chat';
+};
+
 export default function Chat() {
+  const router = useRouter();
+  const pathname = usePathname();
+  
+  // Get pathname synchronously from window if available (for immediate initialization)
+  const getPathnameSync = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname;
+    }
+    return pathname;
+  };
+  
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [activeView, setActiveView] = useState<'chat' | 'deep-research' | 'scholar-research' | 'web-creator' | 'ai-writer' | 'ai-slides'>(() => {
+    const syncPathname = getPathnameSync();
+    return getInitialActiveView(syncPathname);
+  });
+  const [deepResearchTab, setDeepResearchTab] = useState<'general' | 'scholar'>('general');
+  const [deepResearchInput, setDeepResearchInput] = useState('');
+  const [scholarResearchInput, setScholarResearchInput] = useState('');
+  const [webCreatorInput, setWebCreatorInput] = useState('');
   const availableModels = AVAILABLE_MODELS;
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isOtherModelsHovered, setIsOtherModelsHovered] = useState(false);
@@ -301,6 +335,22 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
+  // Sync pathname with activeView using useLayoutEffect to prevent flash
+  // This runs synchronously before browser paint, preventing visual flash
+  useLayoutEffect(() => {
+    const syncPathname = getPathnameSync();
+    const newActiveView = getInitialActiveView(syncPathname || pathname);
+    if (newActiveView !== activeView) {
+      setActiveView(newActiveView);
+    }
+    // Update deepResearchTab based on pathname
+    if (pathname?.startsWith('/wisebase/scholar-research')) {
+      setDeepResearchTab('scholar');
+    } else if (pathname?.startsWith('/wisebase/deep-research')) {
+      setDeepResearchTab('general');
+    }
+  }, [pathname, activeView]);
+
   useEffect(() => {
     // Get user data from localStorage
     const storedUser = localStorage.getItem('user');
@@ -312,6 +362,21 @@ export default function Chat() {
       }
     }
   }, []);
+
+  // Sync activeView with pathname
+  useEffect(() => {
+    if (pathname === '/wisebase/deep-research') {
+      setActiveView('deep-research');
+    } else if (pathname === '/wisebase/web-creator') {
+      setActiveView('web-creator');
+    } else if (pathname === '/wisebase/ai-writer') {
+      setActiveView('ai-writer');
+    } else if (pathname === '/wisebase/ai-slides') {
+      setActiveView('ai-slides');
+    } else if (pathname === '/chat' || pathname === '/') {
+      setActiveView('chat');
+    }
+  }, [pathname]);
 
   const getUserInitial = () => {
     if (userData?.name) {
@@ -1425,10 +1490,20 @@ export default function Chat() {
         <div className="flex-1 overflow-y-auto overflow-x-visible p-4 space-y-6">
           {/* Chat */}
           <div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 mb-2">
+            <motion.button
+              onClick={() => {
+                setActiveView('chat');
+                router.push('/chat');
+              }}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition-colors text-left ${
+                activeView === 'chat'
+                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
               <MessageCircle className="w-5 h-5" />
               <span className="font-semibold">Chat</span>
-            </div>
+            </motion.button>
           </div>
 
           {/* Agents */}
@@ -1439,13 +1514,34 @@ export default function Chat() {
             <div className="space-y-1">
               {agents.map((agent, index) => {
                 const Icon = agent.icon;
+                const agentSlug = agent.name.toLowerCase().replace(/\s+/g, '-') as 'deep-research' | 'web-creator' | 'ai-writer' | 'ai-slides';
+                // Deep Research should be active for both deep-research and scholar-research
+                const isActive = agentSlug === 'deep-research' 
+                  ? (activeView === 'deep-research' || activeView === 'scholar-research')
+                  : activeView === agentSlug;
+                const handleAgentClick = () => {
+                  // Use /agents/ route for web-creator, ai-writer, ai-slides
+                  // Use /wisebase/ for deep-research
+                  const route = agentSlug === 'deep-research'
+                    ? `/wisebase/${agentSlug}`
+                    : `/agents/${agentSlug}`;
+                  // Set activeView immediately to prevent flash
+                  setActiveView(agentSlug);
+                  // Then navigate (this won't cause a full page reload in Next.js)
+                  router.push(route);
+                };
                 return (
                   <motion.button
                     key={agent.name}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                    onClick={handleAgentClick}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
+                      isActive
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
                   >
                     <Icon className="w-4 h-4" />
                     <span className="text-sm">{agent.name}</span>
@@ -1647,7 +1743,7 @@ export default function Chat() {
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-0">
-        <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-end px-6">
+        <header className="h-16 dark:bg-gray-800 border-gray-200 dark:border-gray-700 flex items-center justify-end px-6">
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -1658,8 +1754,51 @@ export default function Chat() {
           </motion.button>
         </header>
 
-        {/* Chat */}
-        {viewMode === 'double' ? (
+        {/* Conditional Content Rendering */}
+        {activeView === 'deep-research' ? (
+          <DeepResearch
+            activeTab={deepResearchTab}
+            setActiveTab={setDeepResearchTab}
+            inputValue={deepResearchInput}
+            setInputValue={setDeepResearchInput}
+            onSend={() => {
+              if (!deepResearchInput.trim()) return;
+              console.log('Sending Deep Research:', deepResearchInput);
+              setDeepResearchInput('');
+            }}
+          />
+        ) : activeView === 'scholar-research' ? (
+          <ScholarResearch
+            inputValue={scholarResearchInput}
+            setInputValue={setScholarResearchInput}
+            onSend={() => {
+              if (!scholarResearchInput.trim()) return;
+              console.log('Sending Scholar Research:', scholarResearchInput);
+              setScholarResearchInput('');
+            }}
+          />
+        ) : activeView === 'web-creator' ? (
+          <WebCreator
+            inputValue={webCreatorInput}
+            setInputValue={setWebCreatorInput}
+            onSend={() => {
+              if (!webCreatorInput.trim()) return;
+              console.log('Sending Web Creator:', webCreatorInput);
+              setWebCreatorInput('');
+            }}
+          />
+        ) : activeView === 'ai-writer' ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-gray-500">AI Writer - Coming Soon</p>
+          </div>
+        ) : activeView === 'ai-slides' ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-gray-500">AI Slides - Coming Soon</p>
+          </div>
+        ) : (
+          /* Chat */
+          <>
+          {viewMode === 'double' ? (
           <div className="flex-1 flex overflow-hidden">
             {/* Panel 1 */}
             <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700 relative">
@@ -2113,8 +2252,11 @@ export default function Chat() {
           </div>
         </div>
         )}
+          </>
+        )}
 
-        {/* Input */}
+        {/* Input - Only show for chat view */}
+        {activeView === 'chat' && (
         <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
           <div className="max-w-4xl mx-auto">
             {/* All buttons in one line */}
@@ -3000,8 +3142,9 @@ export default function Chat() {
              </div>
           </div>
         </div>
+        )}
       </main>
-
+      
       {/* User Profile Dropdown */}
       <UserProfileDropdown
         isOpen={isUserProfileOpen}
