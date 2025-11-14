@@ -19,8 +19,10 @@ import {
   Maximize2,
   Layers,
   Palette,
+  Loader2,
 } from 'lucide-react';
 import UserProfileDropdown from './UserProfileDropdown';
+import { getApiUrl, API_ENDPOINTS } from '../lib/apiConfig';
 
 const sidebarTools = [
   { name: 'AI Image Generator', slug: 'ai-image-generator', icon: Palette },
@@ -36,6 +38,9 @@ const magnificationOptions = [ '4X'];
 
 export default function ImageUpscaler() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null);
+  const [cdnURL, setCdnURL] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [, setProcessedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
@@ -69,14 +74,75 @@ export default function ImageUpscaler() {
     }
   };
 
+  const uploadFile = async (file: File) => {
+    setIsUploading(true);
+    const objectURL = URL.createObjectURL(file);
+    setUploadedImage(objectURL); // Show preview immediately
+    
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken || !authToken.trim()) {
+        console.error('Authentication required. Please login first.');
+        setIsUploading(false);
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('tz_name', '');
+      formData.append('meta', '');
+      formData.append('app_name', '');
+      formData.append('hash', '');
+      formData.append('tasks', '[]');
+      formData.append('mime', '');
+      formData.append('conversation_id', '');
+      formData.append('app_version', '');
+
+      const response = await fetch(getApiUrl(API_ENDPOINTS.FILES.UPLOAD_DIRECTLY), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken.trim()}`,
+          'accept': 'application/json',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to upload file' }));
+        console.error('Error uploading file:', errorData);
+        setIsUploading(false);
+        return;
+      }
+
+      const data = await response.json();
+      const uploadedFileId = data?.data?.fileID || data?.data?.id;
+      const uploadedCdnURL = data?.data?.cdnURL || data?.data?.signedCDNURL;
+      
+      setFileId(uploadedFileId);
+      setCdnURL(uploadedCdnURL);
+      
+      // Use CDN URL if available, otherwise keep object URL
+      if (uploadedCdnURL) {
+        setUploadedImage(uploadedCdnURL);
+        URL.revokeObjectURL(objectURL);
+      }
+      
+      console.log('File uploaded successfully:', {
+        fileId: uploadedFileId,
+        filename: file.name,
+        cdnURL: uploadedCdnURL,
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      uploadFile(file);
     }
   };
 
@@ -84,11 +150,7 @@ export default function ImageUpscaler() {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      uploadFile(file);
     }
   };
 
@@ -201,7 +263,7 @@ export default function ImageUpscaler() {
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                onClick={() => !uploadedImage && fileInputRef.current?.click()}
+                onClick={() => !uploadedImage && !isUploading && fileInputRef.current?.click()}
                 className={`border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl bg-purple-50/30 dark:bg-purple-900/10 min-h-[300px] transition-all duration-200 group ${
                   uploadedImage
                     ? 'p-4 cursor-default'
@@ -216,7 +278,12 @@ export default function ImageUpscaler() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                {uploadedImage ? (
+                {isUploading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 w-full h-full min-h-[300px]">
+                    <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Uploading...</span>
+                  </div>
+                ) : uploadedImage ? (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}

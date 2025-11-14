@@ -52,6 +52,8 @@ import {
   Edit,
   Sliders,
   MoreVertical,
+  GripVertical,
+  Loader2,
 } from 'lucide-react';
 import UserProfileDropdown from './UserProfileDropdown';
 import DeepResearch from './DeepResearch';
@@ -65,6 +67,13 @@ interface DropdownPosition {
   top: number;
   left: number;
   direction: 'up' | 'down';
+}
+
+interface CompletionRequestBody {
+  cid: string | null;
+  model: string;
+  multi_content: Array<{ type: string; text: string }>;
+  file_ids?: string[];
 }
 
 interface Message {
@@ -163,7 +172,7 @@ export default function Chat() {
   };
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('Sider Fusion');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
   const [activeView, setActiveView] = useState<'chat' | 'deep-research' | 'scholar-research' | 'web-creator' | 'ai-writer' | 'ai-slides'>(() => {
     const syncPathname = getPathnameSync();
     return getInitialActiveView(syncPathname);
@@ -213,7 +222,7 @@ export default function Chat() {
   const attachmentButtonRef = useRef<HTMLButtonElement>(null);
   const attachmentDropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [filePreviews, setFilePreviews] = useState<{ file: File; preview: string }[]>([]);
+  const [filePreviews, setFilePreviews] = useState<{ file: File; preview: string; fileId?: string; cdnURL?: string; isUploading?: boolean }[]>([]);
   const [isTranslateDropdownOpen, setIsTranslateDropdownOpen] = useState<number | null>(null);
 
   // Debug: Log filePreviews changes
@@ -508,24 +517,96 @@ export default function Chat() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const fileArray = Array.from(files);
       
-      // Create previews for image files
+      // Create previews for image files with uploading state
       const newPreviews = fileArray
         .filter((file) => file.type.startsWith('image/'))
         .map((file) => ({
           file,
           preview: URL.createObjectURL(file),
+          isUploading: true,
         }));
+      
+      // Add previews immediately with uploading state
+      setFilePreviews((prev) => [...prev, ...newPreviews]);
       
       console.log('Files selected:', fileArray.length, 'Image files:', newPreviews.length);
       console.log('New previews created:', newPreviews);
       
+      // Upload files immediately using upload-directly API
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken || !authToken.trim()) {
+        console.error('Authentication required. Please login first.');
+        // Remove previews if auth fails
+        setFilePreviews((prev) => {
+          const newPreviewNames = new Set(newPreviews.map(p => p.file.name));
+          return prev.filter(p => !newPreviewNames.has(p.file.name));
+        });
+        return;
+      }
+
+      // Upload each file and get file IDs
+      const uploadedPreviews = await Promise.all(
+        newPreviews.map(async (preview) => {
+          try {
+            const formData = new FormData();
+            formData.append('file', preview.file);
+            formData.append('tz_name', '');
+            formData.append('meta', '');
+            formData.append('app_name', '');
+            formData.append('hash', '');
+            formData.append('tasks', '[]');
+            formData.append('mime', '');
+            formData.append('conversation_id', '');
+            formData.append('app_version', '');
+
+            const response = await fetch(getApiUrl(API_ENDPOINTS.FILES.UPLOAD_DIRECTLY), {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authToken.trim()}`,
+                'accept': 'application/json',
+              },
+              body: formData,
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json().catch(() => ({ detail: 'Failed to upload file' }));
+              console.error('Error uploading file:', errorData);
+              return { ...preview, fileId: undefined };
+            }
+
+            const data = await response.json();
+            // Extract file ID and CDN URL from response: { code: 0, data: { fileID: "...", cdnURL: "...", ... } }
+            const fileId = data?.data?.fileID || data?.data?.id;
+            const cdnURL = data?.data?.cdnURL || data?.data?.signedCDNURL;
+            console.log('File uploaded successfully:', {
+              fileId,
+              filename: preview.file.name,
+              cdnURL,
+            });
+            return { ...preview, fileId, cdnURL, isUploading: false };
+          } catch (error) {
+            console.error(`Error uploading file ${preview.file.name}:`, error);
+            return { ...preview, fileId: undefined, isUploading: false };
+          }
+        })
+      );
+      
+      // Update file previews with uploaded data
       setFilePreviews((prev) => {
-        const updated = [...prev, ...newPreviews];
+        const updated = prev.map((prevPreview) => {
+          const uploaded = uploadedPreviews.find(
+            (up) => up.file.name === prevPreview.file.name && prevPreview.isUploading
+          );
+          if (uploaded) {
+            return { ...uploaded, isUploading: false };
+          }
+          return prevPreview;
+        });
         console.log('Updated filePreviews:', updated.length, 'previews');
         return updated;
       });
@@ -546,8 +627,15 @@ export default function Chat() {
 
   const handleExtractText = async () => {
     const message = 'Extract text from this image';
-    const filesToUpload = filePreviews.map(preview => preview.file);
-    const imagePreviews = filePreviews.map(p => p.preview);
+    const fileIds = filePreviews.map(preview => preview.fileId).filter((id): id is string => !!id);
+    // Use CDN URLs if available, otherwise use object URLs
+    const imagePreviews = filePreviews.map(p => p.cdnURL || p.preview);
+    const imageUrls = filePreviews.map(p => p.cdnURL).filter((url): url is string => !!url);
+    
+    // Store object URLs for cleanup later
+    const objectUrlsToCleanup = filePreviews
+      .filter(p => !p.cdnURL)
+      .map(p => p.preview);
     
     // Clear file previews immediately when button is clicked
     if (filePreviews.length > 0) {
@@ -558,31 +646,42 @@ export default function Chat() {
       if (isGenerating || isGenerating2) return;
       const abortController1 = new AbortController();
       const abortController2 = new AbortController();
-      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
       if (isPanel2Open) {
-        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, fileIds, imagePreviews, imageUrls);
       }
     } else {
       if (isGenerating) return;
       const abortController = new AbortController();
-      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
     }
   };
 
   const handleMathSolver = async () => {
     const message = 'Solve the math problems in this image';
-    const filesToUpload = filePreviews.map(preview => preview.file);
-    const imagePreviews = filePreviews.map(p => p.preview);
+    const fileIds = filePreviews.map(preview => preview.fileId).filter((id): id is string => !!id);
+    // Use CDN URLs if available, otherwise use object URLs
+    const imagePreviews = filePreviews.map(p => p.cdnURL || p.preview);
+    const imageUrls = filePreviews.map(p => p.cdnURL).filter((url): url is string => !!url);
+    
+    // Store object URLs for cleanup later
+    const objectUrlsToCleanup = filePreviews
+      .filter(p => !p.cdnURL)
+      .map(p => p.preview);
     
     // Clear file previews immediately when button is clicked
     if (filePreviews.length > 0) {
@@ -593,23 +692,27 @@ export default function Chat() {
       if (isGenerating || isGenerating2) return;
       const abortController1 = new AbortController();
       const abortController2 = new AbortController();
-      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
       if (isPanel2Open) {
-        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, fileIds, imagePreviews, imageUrls);
       }
     } else {
       if (isGenerating) return;
       const abortController = new AbortController();
-      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
     }
   };
@@ -617,8 +720,15 @@ export default function Chat() {
   const handleTranslate = async (languageCode: string, languageName: string) => {
     setIsTranslateDropdownOpen(null);
     const message = `Translate the text in this image to ${languageName}`;
-    const filesToUpload = filePreviews.map(preview => preview.file);
-    const imagePreviews = filePreviews.map(p => p.preview);
+    const fileIds = filePreviews.map(preview => preview.fileId).filter((id): id is string => !!id);
+    // Use CDN URLs if available, otherwise use object URLs
+    const imagePreviews = filePreviews.map(p => p.cdnURL || p.preview);
+    const imageUrls = filePreviews.map(p => p.cdnURL).filter((url): url is string => !!url);
+    
+    // Store object URLs for cleanup later
+    const objectUrlsToCleanup = filePreviews
+      .filter(p => !p.cdnURL)
+      .map(p => p.preview);
     
     // Clear file previews immediately when button is clicked
     if (filePreviews.length > 0) {
@@ -629,23 +739,27 @@ export default function Chat() {
       if (isGenerating || isGenerating2) return;
       const abortController1 = new AbortController();
       const abortController2 = new AbortController();
-      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController1, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
       if (isPanel2Open) {
-        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, filesToUpload, imagePreviews);
+        sendMessageToPanel(2, message, selectedModel2, conversationId2, setConversationId2, setMessages2, setIsGenerating2, abortController2, fileIds, imagePreviews, imageUrls);
       }
     } else {
       if (isGenerating) return;
       const abortController = new AbortController();
-      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, filesToUpload, imagePreviews).finally(() => {
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      await sendMessageToPanel(1, message, selectedModel, conversationId, setConversationId, setMessages, setIsGenerating, abortController, fileIds, imagePreviews, imageUrls).finally(() => {
+        // Revoke object URLs after message is sent (with delay)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
     }
   };
@@ -790,6 +904,60 @@ export default function Chat() {
   }, [messages, conversationId]);
 
   // Helper function to send message to a specific panel
+  // Fetch conversation details
+  const fetchConversation = async (conversationId: string): Promise<void> => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken || !authToken.trim()) return;
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken.trim()}`,
+      };
+
+      const response = await fetch(`${getApiUrl(API_ENDPOINTS.CONVERSATIONS.GET)}/${conversationId}`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Conversation details fetched:', data);
+      }
+    } catch (error) {
+      console.error('Error fetching conversation:', error);
+    }
+  };
+
+  // List all conversations
+  const listConversations = async (): Promise<void> => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken || !authToken.trim()) return;
+
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken.trim()}`,
+      };
+
+      const response = await fetch(getApiUrl(API_ENDPOINTS.CONVERSATIONS.LIST), {
+        method: 'GET',
+        headers,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Conversations listed:', data);
+        // Update chat history if needed
+        if (data.code === 0 && data.data && Array.isArray(data.data)) {
+          // You can update chatHistory state here if needed
+        }
+      }
+    } catch (error) {
+      console.error('Error listing conversations:', error);
+    }
+  };
+
   // Upload files to the API
   const uploadFiles = async (files: File[], abortController: AbortController): Promise<string[]> => {
     if (files.length === 0) return [];
@@ -892,16 +1060,15 @@ export default function Chat() {
     setMessagesState: React.Dispatch<React.SetStateAction<Message[]>>,
     setIsGeneratingState: (value: boolean) => void,
     abortController: AbortController,
-    files?: File[],
-    imagePreviews?: string[] // Optional preview URLs to use instead of creating new ones
+    fileIds?: string[], // File IDs (files are already uploaded when attached)
+    imagePreviews?: string[], // Optional preview URLs to use instead of creating new ones
+    imageUrls?: string[] // CDN URLs for images (used with send API)
   ) => {
     const userMessage: Message = {
       id: `${Date.now()}-${panelNumber}`,
       role: 'user',
       content: messageText,
-      images: imagePreviews && imagePreviews.length > 0 
-        ? imagePreviews 
-        : (files && files.length > 0 ? files.map(f => URL.createObjectURL(f)) : undefined),
+      images: imagePreviews && imagePreviews.length > 0 ? imagePreviews : undefined,
     };
 
     setMessagesState((prev) => [...prev, userMessage]);
@@ -960,8 +1127,8 @@ export default function Chat() {
             setConversationIdState(currentConversationId);
           } else {
             throw new Error('Failed to get conversation ID from response');
-          }
-        } catch (error) {
+        }
+      } catch (error) {
           // Don't throw if request was aborted
           if (error instanceof Error && error.name === 'AbortError') {
             return;
@@ -971,86 +1138,270 @@ export default function Chat() {
         }
       }
 
-      // Step 2: Upload files if any
-      let fileIds: string[] = [];
-      if (files && files.length > 0) {
-        try {
-          console.log(`Uploading ${files.length} file(s) for message:`, messageText);
-          fileIds = await uploadFiles(files, abortController);
-          console.log('Files uploaded successfully. File IDs:', fileIds);
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
+      // Step 2: Determine which API to use based on whether images are present
+      // Step 3: Send message using appropriate API
+      let response;
+      let responseData;
+      
+      // If images are present, use /api/chat/send with image_url
+      if (imageUrls && imageUrls.length > 0) {
+        const requestBody = {
+          message: messageText,
+          model: model || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          stream: false,
+          image_url: imageUrls[0], // Use first image URL
+        };
+        
+        console.log('Sending message with images using send API:', {
+          message: messageText,
+          model: model || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          image_url: imageUrls[0],
+        });
+        
+        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: abortController.signal,
+        });
+
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+          if (response.status === 401 || errorData.detail === 'Authentication required') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
+          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+        }
+
+        responseData = await response.json();
+        
+        // Check again if request was aborted after response
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Check one more time before processing response
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Handle send API response: { code: 0, msg: "", data: { text: "...", conversation_id: "...", tokens_used: ... } }
+        if (responseData.code === 0 && responseData.data) {
+          const { text, conversation_id: cid, tokens_used } = responseData.data;
+          
+          // Check again before updating state
+          if (abortController.signal.aborted) {
             setIsGeneratingState(false);
+            setMessagesState((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
             return;
           }
-          throw error;
+          
+          // Update conversation ID if provided
+          if (cid) {
+            setConversationIdState(cid);
+          }
+          
+          // Update message with response text
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: text || '', isGenerating: false }
+                : msg
+            )
+          );
+          
+          console.log('Message completed:', { cid, tokens_used });
+          
+          // Call GET APIs after successful chat completion (only if not aborted)
+          if (!abortController.signal.aborted) {
+            const finalCid = cid || currentConversationId;
+            if (finalCid) {
+              // Call GET conversation details
+              await fetchConversation(finalCid);
+              // Call LIST conversations
+              await listConversations();
+            }
+          }
+        } else {
+          throw new Error(responseData.msg || 'Invalid response format');
+        }
+      } else {
+        // No images, use completions API
+        const requestBody: CompletionRequestBody = {
+          cid: currentConversationId,
+          model: model || 'gpt-4o-mini',
+          multi_content: [
+            {
+              type: 'text',
+              text: messageText
+            }
+          ],
+          ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
+        };
+        
+        console.log('Sending message without images using completions API:', {
+          message: messageText,
+          model: model || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          file_ids: fileIds && fileIds.length > 0 ? fileIds : 'none',
+          file_count: fileIds ? fileIds.length : 0
+        });
+        
+        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: abortController.signal,
+        });
+
+        // Check if request was aborted
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+          if (response.status === 401 || errorData.detail === 'Authentication required') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
+          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+        }
+
+        responseData = await response.json();
+        
+        // Check again if request was aborted after response
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Check one more time before processing response
+        if (abortController.signal.aborted) {
+          setIsGeneratingState(false);
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Handle completions API response: { code: 0, msg: "", data: { id, text, cid, tokens_used, model, parent_message_id } }
+        if (responseData.code === 0 && responseData.data) {
+          const { text, cid, id, tokens_used, model: responseModel, parent_message_id } = responseData.data;
+          
+          // Check again before updating state
+          if (abortController.signal.aborted) {
+            setIsGeneratingState(false);
+            setMessagesState((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+          
+          // Update conversation ID if provided
+          if (cid) {
+            setConversationIdState(cid);
+          }
+          
+          // Update message with response text
+          setMessagesState((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: text || '', isGenerating: false }
+                : msg
+            )
+          );
+          
+          console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
+          
+          // Call GET APIs after successful chat completion (only if not aborted)
+          if (!abortController.signal.aborted) {
+            const finalCid = cid || currentConversationId;
+            if (finalCid) {
+              // Call GET conversation details
+              await fetchConversation(finalCid);
+              // Call LIST conversations
+              await listConversations();
+            }
+          }
+        } else {
+          throw new Error(responseData.msg || 'Invalid response format');
         }
       }
-
-      // Step 3: Send message with file IDs using completion API
-      const requestBody = {
-        message: messageText,
-        model: model,
-        conversation_id: currentConversationId,
-        ...(fileIds.length > 0 && { file_ids: fileIds }),
-      };
-      
-      console.log('Sending message with request body:', {
-        message: messageText,
-        model: model,
-        conversation_id: currentConversationId,
-        file_ids: fileIds.length > 0 ? fileIds : 'none',
-        file_count: fileIds.length
-      });
-      
-      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: abortController.signal,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-        if (response.status === 401 || errorData.detail === 'Authentication required') {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          throw new Error('Session expired. Please login again.');
-        }
-        throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
-      }
-
-      // Handle completion API response
-      const responseData = await response.json();
-      console.log('Completion API response:', responseData);
-
-      if (responseData.code !== 0) {
-        throw new Error(responseData.msg || 'Failed to get response from API');
-      }
-
-      const completionData = responseData.data;
-      if (!completionData || !completionData.text) {
-        throw new Error('Invalid response format from API');
-      }
-
-      // Update conversation ID if returned in response
-      if (completionData.cid && completionData.cid !== currentConversationId) {
-        setConversationIdState(completionData.cid);
-      }
-
-      // Update the AI message with the response text
-      setMessagesState((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-            ? { ...msg, content: completionData.text, isGenerating: false }
-            : msg
-        )
-      );
-      setIsGeneratingState(false);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         // Request was aborted - ensure state is cleaned up
         setIsGeneratingState(false);
+        setMessagesState((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, isGenerating: false }
+              : msg
+          )
+        );
         return;
       }
       console.error('Error sending message:', error);
@@ -1210,84 +1561,65 @@ export default function Chat() {
           }
         }
 
-        // Step 2: Send message
-        const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+        // Step 2: Send message using completion API
+        const requestBody: CompletionRequestBody = {
+          cid: currentConversationId,
+          model: selectedModel || 'gpt-4o-mini',
+          multi_content: [
+            {
+              type: 'text',
+              text: messageText
+            }
+          ],
+        };
+        
+        const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            message: messageText,
-            model: selectedModel,
-            conversation_id: currentConversationId,
-            stream: true,
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortControllerRef.current.signal,
         });
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-          throw new Error(errorData.detail || errorData.message || 'Failed to send message');
+          throw new Error(errorData.detail || errorData.msg || errorData.message || 'Failed to send message');
         }
 
-        // Step 3: Handle SSE stream
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) {
-          throw new Error('No response body');
-        }
-
-        let buffer = '';
-        let fullResponse = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'chunk' && parsed.text) {
-                  fullResponse += parsed.text;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: fullResponse, isGenerating: true }
-                        : msg
-                    )
-                  );
-                } else if (parsed.type === 'complete') {
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: fullResponse, isGenerating: false }
-                        : msg
-                    )
-                  );
-                  setIsGenerating(false);
-                }
-              } catch (e) {
-                // Ignore JSON parse errors
-              }
-            }
+        // Step 3: Handle JSON response
+        const responseData = await response.json();
+        
+        // Extract data from response structure: { code: 0, msg: "", data: { id, text, cid, tokens_used, model, parent_message_id } }
+        if (responseData.code === 0 && responseData.data) {
+          const { text, cid, id, tokens_used, model: responseModel, parent_message_id } = responseData.data;
+          
+          // Update conversation ID if provided
+          if (cid) {
+            setConversationId(cid);
           }
+          
+          // Update message with response text
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: text || '', isGenerating: false }
+                : msg
+            )
+          );
+          
+          console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
+          
+          // Call GET APIs after successful chat completion
+          const finalCid = cid || currentConversationId;
+          if (finalCid) {
+            // Call GET conversation details
+            await fetchConversation(finalCid);
+            // Call LIST conversations
+            await listConversations();
+          }
+        } else {
+          throw new Error(responseData.msg || 'Invalid response format');
         }
-
-        // Final update
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMessageId
-              ? { ...msg, content: fullResponse, isGenerating: false }
-              : msg
-          )
-        );
+        
         setIsGenerating(false);
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
@@ -1326,13 +1658,19 @@ export default function Chat() {
       abortController1Ref.current = abortController1;
       abortController2Ref.current = abortController2;
       
-      // Get files from filePreviews and clear immediately
-      const filesToUpload = filePreviews.map(preview => preview.file);
-      const imagePreviews = filePreviews.map(p => p.preview);
+      // Get file IDs, image previews, and image URLs from filePreviews before clearing
+      const fileIds = filePreviews.map(preview => preview.fileId).filter((id): id is string => !!id);
+      // Use CDN URLs if available, otherwise use object URLs
+      const imagePreviews = filePreviews.map(p => p.cdnURL || p.preview);
+      const imageUrls = filePreviews.map(p => p.cdnURL).filter((url): url is string => !!url);
+      
+      // Store object URLs for cleanup later (only those without CDN URLs)
+      const objectUrlsToCleanup = filePreviews
+        .filter(p => !p.cdnURL)
+        .map(p => p.preview);
       
       // Clear file previews immediately when send is clicked
       if (filePreviews.length > 0) {
-        // Don't revoke URLs yet - they're still needed for message display
         setFilePreviews([]);
       }
       
@@ -1346,14 +1684,17 @@ export default function Chat() {
         setMessages,
         setIsGenerating,
         abortController1,
-        filesToUpload,
-        imagePreviews
+        fileIds,
+        imagePreviews,
+        imageUrls
       ).finally(() => {
         abortController1Ref.current = null;
-        // Revoke object URLs after message is sent
-        imagePreviews.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+        // Only revoke object URLs that aren't CDN URLs (after a delay to ensure message is rendered)
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       });
       
       // Send to panel 2
@@ -1367,8 +1708,9 @@ export default function Chat() {
           setMessages2,
           setIsGenerating2,
           abortController2,
-          filesToUpload,
-          imagePreviews
+          fileIds,
+          imagePreviews,
+          imageUrls
         ).finally(() => {
           abortController2Ref.current = null;
         });
@@ -1389,18 +1731,21 @@ export default function Chat() {
     setInputValue('');
     setIsGenerating(true);
 
-    // Get files from filePreviews and clear immediately
-    const filesToUpload = filePreviews.map(preview => preview.file);
-    const imagePreviews = filePreviews.map(p => p.preview);
+    // Get file IDs, image previews, and image URLs from filePreviews before clearing
+    const fileIds = filePreviews.map(preview => preview.fileId).filter((id): id is string => !!id);
+    // Use CDN URLs if available, otherwise use object URLs
+    const imagePreviews = filePreviews.map(p => p.cdnURL || p.preview);
+    const imageUrls = filePreviews.map(p => p.cdnURL).filter((url): url is string => !!url);
+    
+    // Store object URLs for cleanup later (only those that aren't CDN URLs)
+    const objectUrlsToCleanup = filePreviews
+      .filter(p => !p.cdnURL)
+      .map(p => p.preview);
     
     // Clear file previews immediately when send is clicked
     if (filePreviews.length > 0) {
-      // Don't revoke URLs yet - they're still needed for message display
       setFilePreviews([]);
     }
-    
-    // Store imagePreviews for later cleanup
-    const imagePreviewsForCleanup = [...imagePreviews];
 
     // Create AI message placeholder
     const aiMessageId = (Date.now() + 1).toString();
@@ -1478,133 +1823,280 @@ export default function Chat() {
         }
       }
 
-      // Step 2: Upload files if any
-      let fileIds: string[] = [];
-      if (filesToUpload.length > 0) {
-        try {
-          console.log(`Uploading ${filesToUpload.length} file(s) for message:`, messageText);
-          fileIds = await uploadFiles(filesToUpload, abortControllerRef.current);
-          console.log('Files uploaded successfully. File IDs:', fileIds);
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
-            setIsGenerating(false);
-            return;
-          }
-          throw error;
-        }
-      }
-
-      // Step 3: Send message with file IDs
-      const requestBody = {
+      // Step 2: Determine which API to use based on whether images are present
+      // Step 3: Send message using appropriate API
+      let response;
+      let responseData;
+      
+      // If images are present, use /api/chat/send with image_url
+      if (imageUrls && imageUrls.length > 0) {
+        const requestBody = {
           message: messageText,
-          model: selectedModel,
-        conversation_id: currentConversationId,
-          stream: true,
-        ...(fileIds.length > 0 && { file_ids: fileIds }),
-      };
-      
-      console.log('Sending message with request body:', {
-        message: messageText,
-        model: selectedModel,
-        conversation_id: currentConversationId,
-        file_ids: fileIds.length > 0 ? fileIds : 'none',
-        file_count: fileIds.length
-      });
-      
-      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+          model: selectedModel || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          stream: false,
+          image_url: imageUrls[0], // Use first image URL
+        };
+        
+        console.log('Sending message with images using send API:', {
+          message: messageText,
+          model: selectedModel || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          image_url: imageUrls[0],
+        });
+        
+        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
         signal: abortControllerRef.current.signal,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-        if (response.status === 401 || errorData.detail === 'Authentication required') {
-          // Clear invalid token and redirect to login
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          throw new Error('Session expired. Please login again.');
+        // Check if request was aborted
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
         }
-        throw new Error(errorData.detail || 'Failed to send message');
-      }
 
-      // Handle SSE streaming
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+          if (response.status === 401 || errorData.detail === 'Authentication required') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
+          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+        }
 
-      if (reader) {
-        let accumulatedContent = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                // Handle chunk type - accumulate text
-                if (data.text && data.type === 'chunk') {
-                  accumulatedContent += data.text;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: accumulatedContent, isGenerating: true }
-                        : msg
-                    )
-                  );
-                }
-                // Handle complete type - use the full text
-                if (data.text && data.type === 'complete') {
-                  accumulatedContent = data.text;
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: accumulatedContent, isGenerating: false }
-                        : msg
-                    )
-                  );
-                  setIsGenerating(false);
-                }
-                // Handle done flag
-                if (data.done) {
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
-                    )
-                  );
-                  setIsGenerating(false);
-                }
-                if (data.conversation_id) {
-                  setConversationId(data.conversation_id);
-                }
-              } catch (e) {
-                // Skip invalid JSON
-                console.error('Error parsing SSE data:', e, line);
-              }
+        responseData = await response.json();
+        
+        // Check again if request was aborted after response
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Check one more time before processing response
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Handle send API response: { code: 0, msg: "", data: { text: "...", conversation_id: "...", tokens_used: ... } }
+        if (responseData.code === 0 && responseData.data) {
+          const { text, conversation_id: cid, tokens_used } = responseData.data;
+          
+          // Check again before updating state
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+          
+          // Update conversation ID if provided
+          if (cid) {
+            setConversationId(cid);
+          }
+          
+          // Update message with response text
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: text || '', isGenerating: false }
+                : msg
+            )
+          );
+          
+          console.log('Message completed:', { cid, tokens_used });
+          
+          // Call GET APIs after successful chat completion (only if not aborted)
+          if (!abortControllerRef.current?.signal.aborted) {
+            const finalCid = cid || currentConversationId;
+            if (finalCid) {
+              // Call GET conversation details
+              await fetchConversation(finalCid);
+              // Call LIST conversations
+              await listConversations();
             }
           }
+        } else {
+          throw new Error(responseData.msg || 'Invalid response format');
+        }
+      } else {
+        // No images, use completions API
+        const requestBody: CompletionRequestBody = {
+          cid: currentConversationId,
+          model: selectedModel || 'gpt-4o-mini',
+          multi_content: [
+            {
+              type: 'text',
+              text: messageText
+            }
+          ],
+          ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
+        };
+        
+        console.log('Sending message without images using completions API:', {
+          message: messageText,
+          model: selectedModel || 'gpt-4o-mini',
+          conversation_id: currentConversationId,
+          file_ids: fileIds && fileIds.length > 0 ? fileIds : 'none',
+          file_count: fileIds ? fileIds.length : 0
+        });
+        
+        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(requestBody),
+          signal: abortControllerRef.current.signal,
+        });
+
+        // Check if request was aborted
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+          if (response.status === 401 || errorData.detail === 'Authentication required') {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('user');
+            throw new Error('Session expired. Please login again.');
+          }
+          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+        }
+
+        responseData = await response.json();
+        
+        // Check again if request was aborted after response
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Check one more time before processing response
+        if (abortControllerRef.current?.signal.aborted) {
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          return;
+        }
+        
+        // Handle completions API response: { code: 0, msg: "", data: { id, text, cid, tokens_used, model, parent_message_id } }
+        if (responseData.code === 0 && responseData.data) {
+          const { text, cid, id, tokens_used, model: responseModel, parent_message_id } = responseData.data;
+          
+          // Check again before updating state
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+          
+          // Update conversation ID if provided
+          if (cid) {
+            setConversationId(cid);
+          }
+          
+          // Update message with response text
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: text || '', isGenerating: false }
+                : msg
+            )
+          );
+          
+          console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
+          
+          // Call GET APIs after successful chat completion (only if not aborted)
+          if (!abortControllerRef.current?.signal.aborted) {
+            const finalCid = cid || currentConversationId;
+            if (finalCid) {
+              // Call GET conversation details
+              await fetchConversation(finalCid);
+              // Call LIST conversations
+              await listConversations();
+            }
+          }
+        } else {
+          throw new Error(responseData.msg || 'Invalid response format');
         }
       }
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
-        )
-      );
       
-      // Revoke object URLs after message is sent
-      if (imagePreviewsForCleanup.length > 0) {
-        imagePreviewsForCleanup.forEach((url) => {
-          URL.revokeObjectURL(url);
-        });
+      // Revoke object URLs after message is sent (with delay to ensure message is rendered)
+      if (objectUrlsToCleanup.length > 0) {
+        setTimeout(() => {
+          objectUrlsToCleanup.forEach((url) => {
+            URL.revokeObjectURL(url);
+          });
+        }, 1000);
       }
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
-        // Request was aborted
+        // Request was aborted - ensure state is cleaned up
+        setIsGenerating(false);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, isGenerating: false }
+              : msg
+          )
+        );
+        abortControllerRef.current = null;
         return;
       }
       console.error('Error sending message:', error);
@@ -1640,20 +2132,7 @@ export default function Chat() {
   };
 
   const handleStopGenerating = () => {
-    // Abort single view controller
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    // Abort double view controllers
-    if (abortController1Ref.current) {
-      abortController1Ref.current.abort();
-      abortController1Ref.current = null;
-    }
-    if (abortController2Ref.current) {
-      abortController2Ref.current.abort();
-      abortController2Ref.current = null;
-    }
+    // Immediately update UI state first
     setIsGenerating(false);
     setIsGenerating2(false);
     setMessages((prev) =>
@@ -1662,6 +2141,20 @@ export default function Chat() {
     setMessages2((prev) =>
       prev.map((msg) => (msg.isGenerating ? { ...msg, isGenerating: false } : msg))
     );
+    
+    // Then abort controllers
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (abortController1Ref.current) {
+      abortController1Ref.current.abort();
+      abortController1Ref.current = null;
+    }
+    if (abortController2Ref.current) {
+      abortController2Ref.current.abort();
+      abortController2Ref.current = null;
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -3284,27 +3777,36 @@ export default function Chat() {
                           className="relative rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-center items-center"
                           style={{ width: '14%', minWidth: '80px', height: '128px' }}
                         >
-                          <img
-                            src={preview.preview}
-                            alt={preview.file.name}
-                            className="max-h-32 w-auto object-contain cursor-pointer"
-                            onClick={() => handleImageClick(index)}
-                            onError={() => {
-                              console.error('Image failed to load:', preview.preview, preview.file.name);
-                            }}
-                            onLoad={() => {
-                              console.log('Image loaded successfully:', preview.file.name);
-                            }}
-                          />
-                          <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                            onClick={() => handleRemoveFile(index)}
-                            className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
-                            title="Remove"
-                          >
-                            <X className="w-3 h-3" />
-                          </motion.button>
+                          {preview.isUploading ? (
+                            <div className="flex flex-col items-center justify-center gap-2 w-full h-full">
+                              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Uploading...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <img
+                                src={preview.preview}
+                                alt={preview.file.name}
+                                className="max-h-32 w-auto object-contain cursor-pointer"
+                                onClick={() => handleImageClick(index)}
+                                onError={() => {
+                                  console.error('Image failed to load:', preview.preview, preview.file.name);
+                                }}
+                                onLoad={() => {
+                                  console.log('Image loaded successfully:', preview.file.name);
+                                }}
+                              />
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleRemoveFile(index)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
+                                title="Remove"
+                              >
+                                <X className="w-3 h-3" />
+                              </motion.button>
+                            </>
+                          )}
                         </div>
                       );
                     })}

@@ -200,15 +200,19 @@ export default function AIImageGenerator({ tool }: AIImageGeneratorProps) {
 
               {/* Example Images */}
               <div className="grid grid-cols-4 gap-4 mb-6">
-                {[1, 2, 3, 4].map((i) => (
+                {['girl1.png', 'girl2.png', 'girl3.png', 'girl4.png'].map((imageName, i) => (
                   <motion.div
                     key={i}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
-                    className="aspect-square rounded-lg bg-gradient-to-br from-purple-200 to-purple-300 dark:from-purple-800 dark:to-purple-900 flex items-center justify-center"
+                    className="aspect-square rounded-lg bg-gradient-to-br from-purple-200 to-purple-300 dark:from-purple-800 dark:to-purple-900 flex items-center justify-center overflow-hidden"
                   >
-                    <div className="text-4xl">👓</div>
+                    <img
+                      src={`/image/${imageName}`}
+                      alt={`Example image ${i + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
                   </motion.div>
                 ))}
               </div>

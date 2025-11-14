@@ -15,10 +15,13 @@ export const API_ENDPOINTS = {
   // Conversation endpoints
   CONVERSATIONS: {
     CREATE: '/api/conversations',
+    GET: '/api/conversations', // GET /api/conversations/{conversation_id}
+    LIST: '/api/conversations',
   },
   // File endpoints
   FILES: {
     UPLOAD: '/api/files/upload',
+    UPLOAD_DIRECTLY: '/api/uploader/v1/file/upload-directly',
   },
 } as const;
 
