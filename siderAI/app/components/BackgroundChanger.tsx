@@ -7,9 +7,6 @@ import {
   Image as ImageIcon,
   Plus,
   ArrowRight,
-  Zap,
-  Star,
-  Diamond,
   Folder,
   MessageCircle,
   Settings as SettingsIcon,
@@ -118,7 +115,7 @@ export default function BackgroundChanger() {
             <div className="flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
               <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                Sider
+                Webby Sider
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -133,7 +130,7 @@ export default function BackgroundChanger() {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => (window.location.href = '/')}
+            onClick={() => (window.location.href = '/chat')}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
           >
             <Home className="w-4 h-4" />
@@ -165,30 +162,6 @@ export default function BackgroundChanger() {
           })}
         </div>
 
-        {/* Credits/Upgrade Section */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="mb-3">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-              <Zap className="w-4 h-4" />
-              <span>28</span>
-              <span className="mx-1">0</span>
-              <Star className="w-4 h-4" />
-              <span>0</span>
-              <Diamond className="w-4 h-4" />
-              <span>0</span>
-            </div>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
-              Upgrade to get more credits
-            </p>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-semibold text-sm hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-            >
-              Upgrade 35% OFF
-            </motion.button>
-          </div>
-        </div>
 
         {/* Footer Icons */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-around">

@@ -51,6 +51,7 @@ import {
   Brain,
   Edit,
   Sliders,
+  MoreVertical,
 } from 'lucide-react';
 import UserProfileDropdown from './UserProfileDropdown';
 import DeepResearch from './DeepResearch';
@@ -161,7 +162,8 @@ export default function Chat() {
     return pathname;
   };
   
-  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('Sider Fusion');
   const [activeView, setActiveView] = useState<'chat' | 'deep-research' | 'scholar-research' | 'web-creator' | 'ai-writer' | 'ai-slides'>(() => {
     const syncPathname = getPathnameSync();
     return getInitialActiveView(syncPathname);
@@ -328,10 +330,10 @@ export default function Chat() {
   ];
 
   const wisebaseItems = [
-    { name: 'Demo: Introduction...' },
-    { name: 'Demo: Research on...' },
-    { name: 'Demo: NVIDIA Busin...' },
-    { name: 'AI Inbox' },
+    { name: 'Demo: Introduction...', icon: FileText, color: 'bg-white', isActive: true },
+    { name: 'Demo: Research on...', icon: Folder, color: 'bg-purple-100 dark:bg-purple-900/20' },
+    { name: 'Demo: NVIDIA Busin...', icon: BarChart3, color: 'bg-orange-100 dark:bg-orange-900/20' },
+    { name: 'AI Inbox', icon: MessageCircle, color: 'bg-green-100 dark:bg-green-900/20' },
   ];
 
   const suggestedPrompts = [
@@ -855,7 +857,7 @@ export default function Chat() {
           throw new Error(errorMessage);
         }
 
-        const data = await response.json();
+          const data = await response.json();
         // Extract file ID from response structure: { code: 0, msg: "", data: { id: "...", ... } }
         const fileId = data?.data?.id || data?.id || data?.file_id || data?.data?.file_id;
         if (fileId) {
@@ -985,12 +987,11 @@ export default function Chat() {
         }
       }
 
-      // Step 3: Send message with file IDs
+      // Step 3: Send message with file IDs using completion API
       const requestBody = {
         message: messageText,
         model: model,
         conversation_id: currentConversationId,
-        stream: true,
         ...(fileIds.length > 0 && { file_ids: fileIds }),
       };
       
@@ -1002,7 +1003,7 @@ export default function Chat() {
         file_count: fileIds.length
       });
       
-      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
         method: 'POST',
         headers,
         body: JSON.stringify(requestBody),
@@ -1016,66 +1017,36 @@ export default function Chat() {
           localStorage.removeItem('user');
           throw new Error('Session expired. Please login again.');
         }
-        throw new Error(errorData.detail || 'Failed to send message');
+        throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
       }
 
-      // Handle SSE streaming
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
+      // Handle completion API response
+      const responseData = await response.json();
+      console.log('Completion API response:', responseData);
 
-      if (reader) {
-        let accumulatedContent = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                // Handle chunk type - accumulate text
-                if (data.text && data.type === 'chunk') {
-                  accumulatedContent += data.text;
-                  setMessagesState((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: accumulatedContent, isGenerating: true }
-                        : msg
-                    )
-                  );
-                }
-                // Handle complete type - use the full text
-                if (data.text && data.type === 'complete') {
-                  accumulatedContent = data.text;
-                  setMessagesState((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, content: accumulatedContent, isGenerating: false }
-                        : msg
-                    )
-                  );
-                  setIsGeneratingState(false);
-                }
-                // Handle done flag
-                if (data.done) {
-                  setMessagesState((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId ? { ...msg, isGenerating: false } : msg
-                    )
-                  );
-                  setIsGeneratingState(false);
-                }
-              } catch (e) {
-                // Skip invalid JSON
-                console.error('Error parsing SSE data:', e, line);
-              }
-            }
-          }
-        }
+      if (responseData.code !== 0) {
+        throw new Error(responseData.msg || 'Failed to get response from API');
       }
+
+      const completionData = responseData.data;
+      if (!completionData || !completionData.text) {
+        throw new Error('Invalid response format from API');
+      }
+
+      // Update conversation ID if returned in response
+      if (completionData.cid && completionData.cid !== currentConversationId) {
+        setConversationIdState(completionData.cid);
+      }
+
+      // Update the AI message with the response text
+      setMessagesState((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMessageId
+            ? { ...msg, content: completionData.text, isGenerating: false }
+            : msg
+        )
+      );
+      setIsGeneratingState(false);
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') {
         // Request was aborted - ensure state is cleaned up
@@ -1093,6 +1064,242 @@ export default function Chat() {
         )
       );
       setIsGeneratingState(false);
+    }
+  };
+
+  const handleSuggestedPrompt = async (promptText: string) => {
+    if (!promptText.trim()) return;
+    
+    if (viewMode === 'double') {
+      // Send to both panels
+      if (isGenerating || isGenerating2) return;
+      
+      const messageText = promptText.trim();
+      
+      // Abort previous requests if any
+      if (abortController1Ref.current) {
+        abortController1Ref.current.abort();
+      }
+      if (abortController2Ref.current) {
+        abortController2Ref.current.abort();
+      }
+      
+      const abortController1 = new AbortController();
+      const abortController2 = new AbortController();
+      abortController1Ref.current = abortController1;
+      abortController2Ref.current = abortController2;
+      
+      // Send to panel 1
+      sendMessageToPanel(
+        1,
+        messageText,
+        selectedModel,
+        conversationId,
+        setConversationId,
+        setMessages,
+        setIsGenerating,
+        abortController1,
+        [],
+        []
+      ).finally(() => {
+        abortController1Ref.current = null;
+      });
+      
+      // Send to panel 2
+      if (isPanel2Open) {
+        sendMessageToPanel(
+          2,
+          messageText,
+          selectedModel2,
+          conversationId2,
+          setConversationId2,
+          setMessages2,
+          setIsGenerating2,
+          abortController2,
+          [],
+          []
+        ).finally(() => {
+          abortController2Ref.current = null;
+        });
+      }
+    } else {
+      // Single view
+      if (isGenerating) return;
+
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: promptText.trim(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      const messageText = promptText.trim();
+      setIsGenerating(true);
+
+      // Create AI message placeholder
+      const aiMessageId = (Date.now() + 1).toString();
+      const aiMessage: Message = {
+        id: aiMessageId,
+        role: 'assistant',
+        content: '',
+        isGenerating: true,
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+
+      // Abort previous request if any
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      try {
+        // Get auth token from localStorage
+        const authToken = localStorage.getItem('authToken');
+        
+        if (!authToken || !authToken.trim()) {
+          throw new Error('Authentication required. Please login first.');
+        }
+        
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken.trim()}`,
+        };
+
+        // Step 1: Create conversation if it doesn't exist
+        let currentConversationId = conversationId;
+        if (!currentConversationId) {
+          try {
+            const conversationResponse = await fetch(getApiUrl(API_ENDPOINTS.CONVERSATIONS.CREATE), {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                title: messageText.substring(0, 50) || 'New Conversation',
+                model: selectedModel,
+              }),
+              signal: abortControllerRef.current.signal,
+            });
+
+            if (!conversationResponse.ok) {
+              const errorData = await conversationResponse.json().catch(() => ({ detail: 'Failed to create conversation' }));
+              if (conversationResponse.status === 422 && errorData.detail) {
+                const errorMsg = Array.isArray(errorData.detail) 
+                  ? errorData.detail.map((e: { msg?: string; message?: string }) => e.msg || e.message).join(', ')
+                  : errorData.detail;
+                throw new Error(`Validation error: ${errorMsg}`);
+              }
+              throw new Error(errorData.detail || errorData.message || 'Failed to create conversation');
+            }
+
+            const conversationData = await conversationResponse.json();
+            currentConversationId = conversationData?.data?.id || conversationData?.id || conversationData?.conversation_id || conversationData?.data?.conversation_id || null;
+            
+            if (currentConversationId) {
+              setConversationId(currentConversationId);
+            } else {
+              throw new Error('Failed to get conversation ID from response');
+            }
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              setIsGenerating(false);
+              return;
+            }
+            console.error('Error creating conversation:', error);
+            setMessages((prev) => prev.filter(m => m.id !== userMessage.id && m.id !== aiMessageId));
+            setIsGenerating(false);
+            throw error;
+          }
+        }
+
+        // Step 2: Send message
+        const response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            message: messageText,
+            model: selectedModel,
+            conversation_id: currentConversationId,
+            stream: true,
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+          throw new Error(errorData.detail || errorData.message || 'Failed to send message');
+        }
+
+        // Step 3: Handle SSE stream
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        let buffer = '';
+        let fullResponse = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'chunk' && parsed.text) {
+                  fullResponse += parsed.text;
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: fullResponse, isGenerating: true }
+                        : msg
+                    )
+                  );
+                } else if (parsed.type === 'complete') {
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === aiMessageId
+                        ? { ...msg, content: fullResponse, isGenerating: false }
+                        : msg
+                    )
+                  );
+                  setIsGenerating(false);
+                }
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            }
+          }
+        }
+
+        // Final update
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, content: fullResponse, isGenerating: false }
+              : msg
+          )
+        );
+        setIsGenerating(false);
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          setIsGenerating(false);
+          return;
+        }
+        console.error('Error sending message:', error);
+        setMessages((prev) => prev.filter(m => m.id !== userMessage.id && m.id !== aiMessageId));
+        setIsGenerating(false);
+      } finally {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -1231,7 +1438,7 @@ export default function Chat() {
           const conversationResponse = await fetch(getApiUrl(API_ENDPOINTS.CONVERSATIONS.CREATE), {
             method: 'POST',
             headers,
-            body: JSON.stringify({
+        body: JSON.stringify({
               title: messageText.substring(0, 50) || 'New Conversation', // Use first 50 chars of message as title
               model: selectedModel,
             }),
@@ -1289,10 +1496,10 @@ export default function Chat() {
 
       // Step 3: Send message with file IDs
       const requestBody = {
-        message: messageText,
-        model: selectedModel,
+          message: messageText,
+          model: selectedModel,
         conversation_id: currentConversationId,
-        stream: true,
+          stream: true,
         ...(fileIds.length > 0 && { file_ids: fileIds }),
       };
       
@@ -1482,26 +1689,46 @@ export default function Chat() {
 
   const handleToolClick = (toolName: string) => {
     const slug = getToolSlug(toolName);
+    // Check if it's a translator tool
+    if (toolName === 'AI Translator' || toolName === 'Image Translator') {
+      const translatorSlug = toolName === 'AI Translator' ? 'text-translator' : 'image-translator';
+      const url = `/translator/${translatorSlug}`;
+      window.open(url, '_blank');
+    } else {
     const url = `/create/image/${slug}`;
     window.open(url, '_blank');
+    }
   };
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
       {/* Sidebar */}
-      <aside className="relative w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+      <aside className={`relative ${isSidebarCollapsed ? 'w-26' : 'w-56'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300`}>
         {/* Logo */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className={`${isSidebarCollapsed ? 'p-2' : 'p-4'} border-b border-gray-200 dark:border-gray-700`}>
+          <div className="flex items-center justify-between">
+            {!isSidebarCollapsed && (
           <div className="flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
             <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Sider
+                  Webby Sider
             </span>
+              </div>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              className={`${isSidebarCollapsed ? 'mx-auto' : ''} p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}
+              title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              <Layout className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            </motion.button>
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-visible p-4 space-y-6">
+        <div className={`flex-1 overflow-y-auto overflow-x-visible ${isSidebarCollapsed ? 'p-2' : 'p-4'} space-y-6`}>
           {/* Chat */}
           <div>
             <motion.button
@@ -1509,22 +1736,24 @@ export default function Chat() {
                 setActiveView('chat');
                 router.push('/chat');
               }}
-              className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg mb-2 transition-colors text-left ${
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-2 px-3 py-2'} rounded-lg mb-2 transition-colors ${isSidebarCollapsed ? '' : 'text-left'} ${
                 activeView === 'chat'
                   ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
                   : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
               }`}
             >
               <MessageCircle className="w-5 h-5" />
-              <span className="font-semibold">Chat</span>
+              {!isSidebarCollapsed && <span className="font-semibold">Chat</span>}
             </motion.button>
           </div>
 
           {/* Agents */}
           <div>
+            {!isSidebarCollapsed && (
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
               Agents
             </h3>
+            )}
             <div className="space-y-1">
               {agents.map((agent, index) => {
                 const Icon = agent.icon;
@@ -1551,14 +1780,16 @@ export default function Chat() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                     onClick={handleAgentClick}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left ${
+                    title={isSidebarCollapsed ? agent.name : ''}
+                    className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isSidebarCollapsed ? '' : 'text-left'}`}
+                    className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg transition-colors text-left ${
                       isActive
                         ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                    }`}
+                    } ${isSidebarCollapsed ? '' : 'text-left'}`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-sm">{agent.name}</span>
+                    <Icon className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
+                    {!isSidebarCollapsed && <span className="text-sm">{agent.name}</span>}
                   </motion.button>
                 );
               })}
@@ -1574,11 +1805,16 @@ export default function Chat() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: agents.length * 0.1 }}
-                  className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${isSidebarCollapsed ? '' : 'text-left'}`}
+                  title={isSidebarCollapsed ? 'More' : ''}
                 >
-                  <Grid3x3 className="w-4 h-4" />
+                  <Grid3x3 className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
+                  {!isSidebarCollapsed && (
+                    <>
                   <span className="text-sm">More</span>
                   <ChevronRight className="w-4 h-4 ml-auto" />
+                    </>
+                  )}
                 </motion.button>
 
                 {isMoreHovered && moreButtonRef.current && (
@@ -1701,60 +1937,71 @@ export default function Chat() {
 
           {/* Wisebase */}
           <div>
+            {!isSidebarCollapsed && (
             <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
               Wisebase
             </h3>
+            )}
             <div className="space-y-1">
-              {wisebaseItems.map((item, index) => (
+              {wisebaseItems.map((item, index) => {
+                const Icon = item.icon;
+                return (
                 <motion.button
                   key={item.name}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: (agents.length + 1 + index) * 0.1 }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
-                >
-                  <span className="text-sm">{item.name}</span>
+                    className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'gap-2 px-3'} py-2 rounded-lg transition-colors ${
+                      isSidebarCollapsed 
+                        ? `${item.color} ${item.isActive ? 'shadow-sm' : ''} text-gray-700 dark:text-gray-300` 
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    } ${isSidebarCollapsed ? '' : 'text-left'}`}
+                    title={isSidebarCollapsed ? item.name : ''}
+                  >
+                    <Icon className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
+                    {!isSidebarCollapsed && <span className="text-sm">{item.name}</span>}
                 </motion.button>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Credits */}
-          <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="px-3 mb-3">
-              <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                <Zap className="w-4 h-4" />
-                <span>+30</span>
-                <span className="mx-1">+0</span>
-                <span>0</span>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
-                Upgrade to get more credits
-              </p>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="w-full px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg font-semibold text-sm hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
-              >
-                Upgrade 35% OFF
-              </motion.button>
-            </div>
-          </div>
         </div>
 
         {/* Footer Icons */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-around">
+        <div className={`${isSidebarCollapsed ? 'p-2' : 'p-4'} border-t border-gray-200 dark:border-gray-700 flex ${isSidebarCollapsed ? 'flex-col items-center gap-3' : 'items-center justify-around'}`}>
           <motion.button
             ref={userProfileButtonRef}
             onClick={handleUserProfileClick}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="relative p-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 flex items-center justify-center transition-all hover:shadow-lg w-9"
+            className="relative p-2 rounded-full bg-gradient-to-r from-orange-400 to-orange-500 flex items-center justify-center transition-all hover:shadow-lg w-9 h-9"
           >
             <span className="text-white font-semibold text-sm">
               {getUserInitial()}
             </span>
           </motion.button>
+          {isSidebarCollapsed ? (
+            <>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="Sparkles"
+              >
+                <Sparkles className="w-5 h-5 text-purple-500" />
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="More"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </motion.button>
+            </>
+          ) : (
+            <>
           {[Folder, MessageCircle, Settings].map((Icon, i) => (
             <motion.button
               key={i}
@@ -1765,11 +2012,15 @@ export default function Chat() {
               <Icon className="w-5 h-5" />
             </motion.button>
           ))}
+            </>
+          )}
         </div>
       </aside>
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-0">
+        {/* Top Pink Line */}
+        <div className="h-0.5 bg-pink-200 dark:bg-pink-900"></div>
         <header className="h-16 dark:bg-gray-800 border-gray-200 dark:border-gray-700 flex items-center justify-end px-6">
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -2213,7 +2464,7 @@ export default function Chat() {
                       transition={{ delay: 0.2 + index * 0.1 }}
                       whileHover={{ scale: 1.02, y: -2 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setInputValue(prompt)}
+                      onClick={() => handleSuggestedPrompt(prompt)}
                       className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-left hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors group"
                     >
                       <span className="text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
@@ -2266,7 +2517,7 @@ export default function Chat() {
                           </div>
                         )}
                         {message.content && (
-                          <p className="text-gray-900 dark:text-white">{message.content}</p>
+                        <p className="text-gray-900 dark:text-white">{message.content}</p>
                         )}
                       </div>
                     )}
@@ -2676,8 +2927,10 @@ export default function Chat() {
                 )}
               </div>
 
+              {/* Right Side Action Buttons */}
+              <div className="flex items-center gap-2 ml-auto">
               {/* Chat Controls Button */}
-              <div className="relative flex items-center group" style={{ marginLeft: '47%' }}>
+              <div className="relative flex items-center group">
                 <motion.button
                   ref={chatControlsButtonRef}
                   whileHover={{ scale: 1.05 }}
@@ -3006,13 +3259,15 @@ export default function Chat() {
                   onClick={handleNewChat}
                   className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
-                  <Plus className="w-5 h-5 text-purple-500" />
+                  <MessageCircle className="w-5 h-5 text-purple-500" />
+                  <Plus className="w-3 h-3 text-purple-500 absolute -top-0.5 -right-0.5 bg-white rounded-full" />
                 </motion.button>
                 {/* Tooltip for New Chat */}
                 <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                   New chat
                   <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                 </div>
+              </div>
               </div>
             </div>
 
@@ -3043,8 +3298,8 @@ export default function Chat() {
                             }}
                           />
                           <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
                             onClick={() => handleRemoveFile(index)}
                             className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
                             title="Remove"
@@ -3115,13 +3370,13 @@ export default function Chat() {
                                 className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                               >
                                 {lang.name}
-                              </motion.button>
-                            ))}
+                </motion.button>
+              ))}
                           </div>
                         </motion.div>
                       )}
-                    </div>
-                    
+            </div>
+
                   </div>
                 </div>
               )}
@@ -3159,7 +3414,7 @@ export default function Chat() {
                        whileTap={{ scale: 0.95 }}
                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
                      >
-                       <Search className="w-3.5 h-3.5" />
+                       <Globe className="w-3.5 h-3.5" />
                        Search
                      </motion.button>
                    </div>
