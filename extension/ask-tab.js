@@ -2,7 +2,7 @@
   'use strict';
   
   const AskTab = {
-    currentModel: 'GPT-5',
+    currentModel: 'gpt -5',
     currentPrompt: 'custom',
     
     init: async function() {
@@ -44,23 +44,23 @@
       const iconImg = document.getElementById('sider-ask-ai-icon-img');
       if (iconImg) {
         const iconMap = {
-          'gpt-4o-mini': chrome.runtime.getURL('icons/chatgpt.png'),
-          'Sider Fusion': chrome.runtime.getURL('icons/fusion.png'),
-          'GPT-5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
-          'Cloude Haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Flash': chrome.runtime.getURL('icons/gemini.png'),
-          'GPT-5': chrome.runtime.getURL('icons/chatgpt.png'),
-          'GPT-4.0': chrome.runtime.getURL('icons/chatgpt.png'),
-          'DeepSeek V3.1': chrome.runtime.getURL('icons/deepseek.png'),
-          'Cloude Sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Pro': chrome.runtime.getURL('icons/gemini.png'),
-          'Grok 4': chrome.runtime.getURL('icons/grok.png'),
-          'claude-3.5-haiku': chrome.runtime.getURL('icons/claude.png'),
-          'kimi-k2': chrome.runtime.getURL('icons/kimi.png'),
-          'deepseek-v3': chrome.runtime.getURL('icons/deepseek.png'),
-          'claude-3.7-sonnet': chrome.runtime.getURL('icons/claude.png'),
-          'claude-sonnet-4': chrome.runtime.getURL('icons/claude.png'),
-          'claude-opus-4.1': chrome.runtime.getURL('icons/claude.png'),
+          'webby fusion': chrome.runtime.getURL('icons/fusion.png'),
+          'gpt -5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
+          'claude haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 flash': chrome.runtime.getURL('icons/gemini.png'),
+          'gpt -5': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -4.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -5.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'deepseek v3.1': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 pro': chrome.runtime.getURL('icons/gemini.png'),
+          'grok 4': chrome.runtime.getURL('icons/grok.png'),
+          'claude 3.5 haiku': chrome.runtime.getURL('icons/claude.png'),
+          'kimi k2': chrome.runtime.getURL('icons/kimi.png'),
+          'deepseek v3': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude 3.7 sonnet': chrome.runtime.getURL('icons/claude.png'),
+          'claude sonnet 4': chrome.runtime.getURL('icons/claude.png'),
+          'claude opus 4.1': chrome.runtime.getURL('icons/claude.png'),
           'chatgpt': chrome.runtime.getURL('icons/fusion.png'),
           'gpt4': chrome.runtime.getURL('icons/chatgpt.png'),
           'gemini': chrome.runtime.getURL('icons/gemini.png'),
@@ -68,8 +68,8 @@
           'groq': chrome.runtime.getURL('icons/grok.png')
         };
         
-        const savedModel = localStorage.getItem('sider-ask-model') || 'GPT-5';
-        const iconUrl = iconMap[savedModel] || iconMap['GPT-5'] || chrome.runtime.getURL('icons/chatgpt.png');
+        const savedModel = localStorage.getItem('sider-ask-model') || 'gpt -5';
+        const iconUrl = iconMap[savedModel] || iconMap['gpt -5'] || chrome.runtime.getURL('icons/chatgpt.png');
         iconImg.src = iconUrl;
       }
     },
@@ -111,23 +111,23 @@
       
       if (iconImg) {
         const iconMap = {
-          'gpt-4o-mini': chrome.runtime.getURL('icons/chatgpt.png'),
-          'Sider Fusion': chrome.runtime.getURL('icons/fusion.png'),
-          'GPT-5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
-          'Cloude Haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Flash': chrome.runtime.getURL('icons/gemini.png'),
-          'GPT-5': chrome.runtime.getURL('icons/chatgpt.png'),
-          'GPT-4.0': chrome.runtime.getURL('icons/chatgpt.png'),
-          'DeepSeek V3.1': chrome.runtime.getURL('icons/deepseek.png'),
-          'Cloude Sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Pro': chrome.runtime.getURL('icons/gemini.png'),
-          'Grok 4': chrome.runtime.getURL('icons/grok.png'),
-          'claude-3.5-haiku': chrome.runtime.getURL('icons/claude.png'),
-          'kimi-k2': chrome.runtime.getURL('icons/kimi.png'),
-          'deepseek-v3': chrome.runtime.getURL('icons/deepseek.png'),
-          'claude-3.7-sonnet': chrome.runtime.getURL('icons/claude.png'),
-          'claude-sonnet-4': chrome.runtime.getURL('icons/claude.png'),
-          'claude-opus-4.1': chrome.runtime.getURL('icons/claude.png'),
+          'webby fusion': chrome.runtime.getURL('icons/fusion.png'),
+          'gpt -5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
+          'claude haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 flash': chrome.runtime.getURL('icons/gemini.png'),
+          'gpt -5': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -4.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -5.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'deepseek v3.1': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 pro': chrome.runtime.getURL('icons/gemini.png'),
+          'grok 4': chrome.runtime.getURL('icons/grok.png'),
+          'claude 3.5 haiku': chrome.runtime.getURL('icons/claude.png'),
+          'kimi k2': chrome.runtime.getURL('icons/kimi.png'),
+          'deepseek v3': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude 3.7 sonnet': chrome.runtime.getURL('icons/claude.png'),
+          'claude sonnet 4': chrome.runtime.getURL('icons/claude.png'),
+          'claude opus 4.1': chrome.runtime.getURL('icons/claude.png'),
           'chatgpt': chrome.runtime.getURL('icons/fusion.png'),
           'gpt4': chrome.runtime.getURL('icons/chatgpt.png'),
           'gemini': chrome.runtime.getURL('icons/gemini.png'),
@@ -135,7 +135,7 @@
           'groq': chrome.runtime.getURL('icons/grok.png')
         };
         
-        const iconUrl = iconMap[model] || iconMap['GPT-5'] || chrome.runtime.getURL('icons/chatgpt.png');
+        const iconUrl = iconMap[model] || iconMap['gpt -5'] || chrome.runtime.getURL('icons/chatgpt.png');
         iconImg.src = iconUrl;
       }
       

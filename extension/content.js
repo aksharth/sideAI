@@ -334,13 +334,22 @@
   });
   
   window.addEventListener('sider:prompt-text', (e) => {
-    if (e.detail && e.detail.text && e.detail.prompt) {
-      chrome.runtime.sendMessage({
-        type: 'TEXT_ACTION',
-        action: 'prompt',
-        text: e.detail.text,
-        prompt: e.detail.prompt
-      });
+    if (e.detail) {
+      // If conversationId is provided, load the existing conversation instead of creating a new prompt
+      if (e.detail.conversationId) {
+        chrome.runtime.sendMessage({
+          type: 'LOAD_CONVERSATION',
+          conversationId: e.detail.conversationId
+        });
+      } else if (e.detail.text && e.detail.prompt) {
+        // Otherwise, send the prompt as before
+        chrome.runtime.sendMessage({
+          type: 'TEXT_ACTION',
+          action: 'prompt',
+          text: e.detail.text,
+          prompt: e.detail.prompt
+        });
+      }
     }
   });
   

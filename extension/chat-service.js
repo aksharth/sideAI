@@ -1,15 +1,54 @@
 (function() {
   'use strict';
 
-  // Get API base URL from storage or use default
+  // Use extension API config
   const getApiBaseUrl = () => {
+    if (window.SiderExtensionAPI) {
+      return window.SiderExtensionAPI.getBaseUrl();
+    }
+    // Fallback if extension_api.js is not loaded
     return new Promise((resolve) => {
       chrome.storage.sync.get(['sider_api_base_url'], (result) => {
         let baseUrl = result.sider_api_base_url || 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
-        // Remove /docs if present
         baseUrl = baseUrl.replace(/\/docs\/?$/, '');
         resolve(baseUrl);
       });
+    });
+  };
+
+  // Helper function to get auth token from multiple sources
+  const getAuthToken = () => {
+    // Try localStorage first (works in sidepanel context)
+    if (typeof localStorage !== 'undefined') {
+      const token = localStorage.getItem('authToken');
+      if (token) return token;
+    }
+    
+    // Try chrome.storage as fallback (works in content scripts)
+    // Note: This is synchronous check, actual async retrieval happens in the function
+    return null;
+  };
+
+  // Async helper to get auth token with fallback to chrome.storage
+  const getAuthTokenAsync = () => {
+    return new Promise((resolve) => {
+      // First try localStorage (sidepanel context)
+      if (typeof localStorage !== 'undefined') {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+          resolve(token);
+          return;
+        }
+      }
+      
+      // Fallback to chrome.storage (content script context)
+      if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['authToken'], (result) => {
+          resolve(result.authToken || null);
+        });
+      } else {
+        resolve(null);
+      }
     });
   };
 
@@ -17,22 +56,26 @@
     async createConversation(title, model) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.create || '/api/conversations') : `${baseUrl}/api/conversations`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers,
           body: JSON.stringify({
             title: title || 'New Conversation',
             model: model
@@ -72,21 +115,25 @@
     async getConversation(conversationId) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.get(conversationId) || `/api/conversations/${conversationId}`) : `${baseUrl}/api/conversations/${conversationId}`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
+          headers
         });
 
         const data = await response.json();
@@ -121,22 +168,26 @@
     async updateConversation(conversationId, title) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.update(conversationId) || `/api/conversations/${conversationId}`) : `${baseUrl}/api/conversations/${conversationId}`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'PUT',
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers,
           body: JSON.stringify({
             title: title
           })
@@ -174,21 +225,25 @@
     async deleteConversation(conversationId) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.delete(conversationId) || `/api/conversations/${conversationId}`) : `${baseUrl}/api/conversations/${conversationId}`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'DELETE',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
+          headers
         });
 
         const data = await response.json();
@@ -223,22 +278,26 @@
     async sendMessage(conversationId, message, model) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations/${conversationId}/messages`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.messages(conversationId) || `/api/conversations/${conversationId}/messages`) : `${baseUrl}/api/conversations/${conversationId}/messages`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers,
           body: JSON.stringify({
             message: message,
             model: model
@@ -277,21 +336,25 @@
     async listConversations() {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.list || '/api/conversations') : `${baseUrl}/api/conversations`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
+          headers
         });
 
         const data = await response.json();
@@ -327,22 +390,26 @@
     async exportConversation(conversationId) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
-        const response = await fetch(`${baseUrl}/api/conversations/${conversationId}/export`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.conversations?.export(conversationId) || `/api/conversations/${conversationId}/export`) : `${baseUrl}/api/conversations/${conversationId}/export`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers,
           body: JSON.stringify({})
         });
 
@@ -436,12 +503,12 @@
     async sendMessageWithImage(conversationId, message, model, imageUrl, stream = false, abortController = null) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
@@ -462,13 +529,17 @@
 
         const signal = abortController ? abortController.signal : null;
 
-        const response = await fetch(`${baseUrl}/api/chat/send`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.chat?.send || '/api/chat/send') : `${baseUrl}/api/chat/send`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          },
+          headers,
           body: JSON.stringify(requestBody),
           signal: signal
         });
@@ -510,12 +581,12 @@
     async chatCompletions(cid, message, model, options = {}) {
       try {
         const baseUrl = await getApiBaseUrl();
-        const authToken = localStorage.getItem('authToken');
+        const authToken = await getAuthTokenAsync();
         
         if (!authToken) {
           return {
             success: false,
-            error: 'No authentication token found'
+            error: 'No authentication token found. Please login first.'
           };
         }
 
@@ -564,13 +635,17 @@
           }
           
           try {
-            const response = await fetch(`${baseUrl}/api/chat/v1/completions`, {
+            const api = window.SiderExtensionAPI || {};
+            const url = api.buildUrl ? await api.buildUrl(api.endpoints?.chat?.completions || '/api/chat/v1/completions') : `${baseUrl}/api/chat/v1/completions`;
+            const headers = api.getHeaders ? await api.getHeaders() : {
+              'accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            };
+
+            const response = await fetch(url, {
               method: 'POST',
-              headers: {
-                'accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-              },
+              headers,
               body: JSON.stringify(requestBody),
               signal: signal
             });

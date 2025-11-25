@@ -24,6 +24,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === 'CHAT_REQUEST') {
     handleChatRequest(request, sendResponse);
     return true; // Indicates we will send a response asynchronously
+  } else if (request.type === 'API_CREATE_CONVERSATION') {
+    handleCreateConversation(request, sendResponse);
+    return true; // Indicates we will send a response asynchronously
+  } else if (request.type === 'API_CHAT_COMPLETIONS') {
+    handleChatCompletions(request, sendResponse);
+    return true; // Indicates we will send a response asynchronously
   } else if (request.type === 'CAPTURE_SCREENSHOT') {
     captureScreenshot(request.bounds, sender.tab?.id, sendResponse);
     return true; // Indicates we will send a response asynchronously
@@ -34,6 +40,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === 'TEXT_SELECTED' || request.type === 'TEXT_ACTION') {
     // Handle text selection: ensure side panel is open and switch to chat tab
     handleTextSelection(request, sender.tab?.id);
+    return false;
+  } else if (request.type === 'LOAD_CONVERSATION') {
+    // Handle loading an existing conversation: ensure side panel is open and load conversation
+    handleLoadConversation(request, sender.tab?.id);
     return false;
   } else if (request.type === 'SCREENSHOT_CAPTURED') {
     // Forward messages from content script to side panel
@@ -124,6 +134,45 @@ async function handleTextSelection(request, tabId) {
       type: request.type,
       text: request.text,
       action: request.action
+    });
+  }
+}
+
+async function handleLoadConversation(request, tabId) {
+  try {
+    // Ensure side panel is open
+    if (tabId) {
+      await chrome.sidePanel.open({ tabId: tabId });
+    }
+    
+    // Wait a bit for side panel to load, then send message to load conversation
+    setTimeout(() => {
+      // Send message to sidepanel to switch to chat tab
+      chrome.runtime.sendMessage({
+        type: 'SWITCH_TO_CHAT_TAB'
+      }).catch(() => {
+        // Side panel might not be loaded yet, try again
+        setTimeout(() => {
+          chrome.runtime.sendMessage({
+            type: 'SWITCH_TO_CHAT_TAB'
+          });
+        }, 500);
+      });
+      
+      // Send the load conversation message after switching to chat tab
+      setTimeout(() => {
+        chrome.runtime.sendMessage({
+          type: 'LOAD_CONVERSATION',
+          conversationId: request.conversationId
+        });
+      }, 300);
+    }, 200);
+  } catch (error) {
+    console.error('Error handling load conversation:', error);
+    // Fallback: just send the message directly
+    chrome.runtime.sendMessage({
+      type: 'LOAD_CONVERSATION',
+      conversationId: request.conversationId
     });
   }
 }
@@ -285,6 +334,189 @@ async function callClaude(message, apiKey) {
     return data.content[0]?.text || 'No response';
   } catch (error) {
     throw new Error(`Claude API Error: ${error.message}`);
+  }
+}
+
+// Helper to get API base URL
+async function getApiBaseUrl() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['sider_api_base_url'], (result) => {
+      let baseUrl = result.sider_api_base_url || 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
+      baseUrl = baseUrl.replace(/\/docs\/?$/, '');
+      resolve(baseUrl);
+    });
+  });
+}
+
+// Helper to get auth token from chrome.storage
+async function getAuthToken() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['authToken'], (result) => {
+      resolve(result.authToken || null);
+    });
+  });
+}
+
+// Handle createConversation API call
+async function handleCreateConversation(request, sendResponse) {
+  try {
+    const { title, model } = request;
+    const baseUrl = await getApiBaseUrl();
+    const authToken = await getAuthToken();
+    
+    if (!authToken) {
+      sendResponse({
+        success: false,
+        error: 'No authentication token found. Please login first.'
+      });
+      return;
+    }
+
+    const url = `${baseUrl}/api/conversations`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({
+        title: title || 'New Conversation',
+        model: model
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      sendResponse({
+        success: false,
+        error: data.detail || data.message || 'Failed to create conversation'
+      });
+      return;
+    }
+
+    // API returns { code: 0, data: { ... }, msg: "" }
+    if (data.code === 0 && data.data) {
+      sendResponse({
+        success: true,
+        data: data.data
+      });
+    } else {
+      sendResponse({
+        success: false,
+        error: 'Invalid response format from server'
+      });
+    }
+  } catch (error) {
+    console.error('Create conversation error:', error);
+    sendResponse({
+      success: false,
+      error: error.message || 'Failed to create conversation'
+    });
+  }
+}
+
+// Handle chatCompletions API call
+async function handleChatCompletions(request, sendResponse) {
+  try {
+    const { cid, message, model, options = {} } = request;
+    const baseUrl = await getApiBaseUrl();
+    const authToken = await getAuthToken();
+    
+    if (!authToken) {
+      sendResponse({
+        success: false,
+        error: 'No authentication token found. Please login first.'
+      });
+      return;
+    }
+
+    const requestBody = {
+      stream: options.stream || false,
+      cid: cid,
+      model: model,
+      filter_search_history: options.filter_search_history || false,
+      from: options.from || 'chat',
+      client_prompt: options.client_prompt || null,
+      chat_models: options.chat_models || [],
+      quote: options.quote || '',
+      multi_content: options.multi_content || [
+        {
+          type: 'text',
+          text: message
+        }
+      ],
+      prompt_templates: options.prompt_templates || [],
+      tools: options.tools || null
+    };
+
+    // Remove null/empty optional fields
+    if (!requestBody.client_prompt) {
+      delete requestBody.client_prompt;
+    }
+    if (!requestBody.tools) {
+      delete requestBody.tools;
+    }
+    if (requestBody.quote === '') {
+      delete requestBody.quote;
+    }
+
+    const url = `${baseUrl}/api/chat/v1/completions`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    // Handle non-JSON responses
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+      } catch {
+        sendResponse({
+          success: false,
+          error: `Server error (${response.status}): ${response.statusText || 'Service unavailable'}`
+        });
+        return;
+      }
+    }
+
+    if (!response.ok) {
+      sendResponse({
+        success: false,
+        error: data.detail || data.message || `Server error: ${response.statusText || response.status}`
+      });
+      return;
+    }
+
+    // API returns { code: 0, data: { ... }, msg: "" }
+    if (data.code === 0 && data.data) {
+      sendResponse({
+        success: true,
+        data: data.data
+      });
+    } else {
+      sendResponse({
+        success: false,
+        error: 'Invalid response format from server'
+      });
+    }
+  } catch (error) {
+    console.error('Chat completions error:', error);
+    sendResponse({
+      success: false,
+      error: error.message || 'Failed to get chat completion'
+    });
   }
 }
 

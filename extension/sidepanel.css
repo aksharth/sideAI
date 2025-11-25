@@ -313,16 +313,12 @@ body {
 }
 
 .sider-sidebar-icon-spacer {
-  margin-top: 16px;
+  margin-top: 45px;
 }
 
 .sider-selected-option-icon {
   color: #8b5cf6;
   background: #f5f3ff;
-}
-
-.sider-sidebar-icon[title="Mobile"] {
-  margin-top: 45px;
 }
 
 .sider-sidebar-badge {
@@ -418,8 +414,8 @@ body {
   justify-content: center;
   font-size: 16px;
   font-weight: 600;
-  color: #8b5cf6;
-  background: #f5f3ff;
+  color: #ffffff;
+  background: #7762e0;
   border-radius: 50%;
   position: absolute;
   top: 0;

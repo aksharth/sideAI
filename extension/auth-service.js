@@ -1,32 +1,35 @@
 (function() {
     'use strict';
   
-    // Get API base URL from storage or use default
-    // Remove /docs if present as it's just for Swagger UI
+    // Use extension API config
     const getApiBaseUrl = () => {
-      // Try to get from storage first (for production)
+      if (window.SiderExtensionAPI) {
+        return window.SiderExtensionAPI.getBaseUrl();
+      }
+      // Fallback if extension_api.js is not loaded
       return new Promise((resolve) => {
         chrome.storage.sync.get(['sider_api_base_url'], (result) => {
           let baseUrl = result.sider_api_base_url || 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
-          // Remove /docs if present
           baseUrl = baseUrl.replace(/\/docs\/?$/, '');
           resolve(baseUrl);
         });
       });
     };
-    
-    const API_BASE_URL = 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
   
     const AuthService = {
       async register(email, password, username) {
         try {
           const baseUrl = await getApiBaseUrl();
-          const response = await fetch(`${baseUrl}/api/auth/register`, {
+          const api = window.SiderExtensionAPI || {};
+          const url = api.buildUrl ? await api.buildUrl(api.endpoints?.auth?.register || '/api/auth/register') : `${baseUrl}/api/auth/register`;
+          const headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json'
+          };
+
+          const response = await fetch(url, {
             method: 'POST',
-            headers: {
-              'accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
+            headers,
             body: JSON.stringify({
               email: email.trim(),
               username: username?.trim() || email.split('@')[0],
@@ -59,12 +62,16 @@
       async login(email, password) {
         try {
           const baseUrl = await getApiBaseUrl();
-          const response = await fetch(`${baseUrl}/api/auth/login`, {
+          const api = window.SiderExtensionAPI || {};
+          const url = api.buildUrl ? await api.buildUrl(api.endpoints?.auth?.login || '/api/auth/login') : `${baseUrl}/api/auth/login`;
+          const headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json'
+          };
+
+          const response = await fetch(url, {
             method: 'POST',
-            headers: {
-              'accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
+            headers,
             body: JSON.stringify({
               email: email.trim(),
               password: password
@@ -92,6 +99,16 @@
             try {
               // Store access_token as 'authToken' (matching siderAI convention)
               localStorage.setItem('authToken', data.data.access_token);
+              
+              // Also save to chrome.storage for content scripts to access
+              if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                chrome.storage.local.set({
+                  authToken: data.data.access_token,
+                  refreshToken: data.data.refresh_token || null
+                }, () => {
+                  console.log('✅ Tokens also saved to chrome.storage.local');
+                });
+              }
               console.log('✅ Token stored in localStorage as "authToken"');
               
               // Store refresh_token if available
@@ -171,12 +188,16 @@
             };
           }
 
-          const response = await fetch(`${baseUrl}/api/auth/me`, {
+          const api = window.SiderExtensionAPI || {};
+          const url = api.buildUrl ? await api.buildUrl(api.endpoints?.auth?.me || '/api/auth/me') : `${baseUrl}/api/auth/me`;
+          const headers = api.getHeaders ? await api.getHeaders() : {
+            'accept': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          };
+
+          const response = await fetch(url, {
             method: 'GET',
-            headers: {
-              'accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
+            headers
           });
 
           const data = await response.json();
@@ -311,6 +332,16 @@
             // Store refresh_token if available
             if (refreshToken) {
               localStorage.setItem('refreshToken', refreshToken);
+            }
+
+            // Also save to chrome.storage for content scripts to access
+            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+              chrome.storage.local.set({
+                authToken: accessToken,
+                refreshToken: refreshToken || null
+              }, () => {
+                console.log('✅ Tokens also saved to chrome.storage.local');
+              });
             }
 
             // Verify tokens were saved
