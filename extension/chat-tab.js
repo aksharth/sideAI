@@ -1,9 +1,92 @@
 (function() {
   'use strict';
   
+  // World Languages List
+  const WORLD_LANGUAGES = [
+    { code: 'en', name: 'English', native: 'English' },
+    { code: 'es', name: 'Spanish', native: 'Español' },
+    { code: 'fr', name: 'French', native: 'Français' },
+    { code: 'de', name: 'German', native: 'Deutsch' },
+    { code: 'it', name: 'Italian', native: 'Italiano' },
+    { code: 'pt', name: 'Portuguese', native: 'Português' },
+    { code: 'ru', name: 'Russian', native: 'Русский' },
+    { code: 'ja', name: 'Japanese', native: '日本語' },
+    { code: 'ko', name: 'Korean', native: '한국어' },
+    { code: 'zh', name: 'Chinese', native: '中文' },
+    { code: 'hi', name: 'Hindi', native: 'हिन्दी' },
+    { code: 'mr', name: 'Marathi', native: 'मराठी' },
+    { code: 'gu', name: 'Gujarati', native: 'ગુજરાતી' },
+    { code: 'bn', name: 'Bengali', native: 'বাংলা' },
+    { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+    { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+    { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+    { code: 'ml', name: 'Malayalam', native: 'മലയാളം' },
+    { code: 'pa', name: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+    { code: 'ur', name: 'Urdu', native: 'اردو' },
+    { code: 'ar', name: 'Arabic', native: 'العربية' },
+    { code: 'he', name: 'Hebrew', native: 'עברית' },
+    { code: 'tr', name: 'Turkish', native: 'Türkçe' },
+    { code: 'pl', name: 'Polish', native: 'Polski' },
+    { code: 'nl', name: 'Dutch', native: 'Nederlands' },
+    { code: 'sv', name: 'Swedish', native: 'Svenska' },
+    { code: 'da', name: 'Danish', native: 'Dansk' },
+    { code: 'no', name: 'Norwegian', native: 'Norsk' },
+    { code: 'fi', name: 'Finnish', native: 'Suomi' },
+    { code: 'cs', name: 'Czech', native: 'Čeština' },
+    { code: 'hu', name: 'Hungarian', native: 'Magyar' },
+    { code: 'ro', name: 'Romanian', native: 'Română' },
+    { code: 'bg', name: 'Bulgarian', native: 'Български' },
+    { code: 'hr', name: 'Croatian', native: 'Hrvatski' },
+    { code: 'sr', name: 'Serbian', native: 'Српски' },
+    { code: 'sk', name: 'Slovak', native: 'Slovenčina' },
+    { code: 'sl', name: 'Slovenian', native: 'Slovenščina' },
+    { code: 'uk', name: 'Ukrainian', native: 'Українська' },
+    { code: 'el', name: 'Greek', native: 'Ελληνικά' },
+    { code: 'th', name: 'Thai', native: 'ไทย' },
+    { code: 'vi', name: 'Vietnamese', native: 'Tiếng Việt' },
+    { code: 'id', name: 'Indonesian', native: 'Bahasa Indonesia' },
+    { code: 'ms', name: 'Malay', native: 'Bahasa Melayu' },
+    { code: 'tl', name: 'Filipino', native: 'Filipino' },
+    { code: 'sw', name: 'Swahili', native: 'Kiswahili' },
+    { code: 'af', name: 'Afrikaans', native: 'Afrikaans' },
+    { code: 'zu', name: 'Zulu', native: 'isiZulu' },
+    { code: 'xh', name: 'Xhosa', native: 'isiXhosa' },
+    { code: 'am', name: 'Amharic', native: 'አማርኛ' },
+    { code: 'fa', name: 'Persian', native: 'فارسی' },
+    { code: 'ne', name: 'Nepali', native: 'नेपाली' },
+    { code: 'si', name: 'Sinhala', native: 'සිංහල' },
+    { code: 'my', name: 'Myanmar', native: 'မြန်မာ' },
+    { code: 'km', name: 'Khmer', native: 'ខ្មែរ' },
+    { code: 'lo', name: 'Lao', native: 'ລາວ' },
+    { code: 'ka', name: 'Georgian', native: 'ქართული' },
+    { code: 'hy', name: 'Armenian', native: 'Հայերեն' },
+    { code: 'az', name: 'Azerbaijani', native: 'Azərbaycan' },
+    { code: 'kk', name: 'Kazakh', native: 'Қазақ' },
+    { code: 'ky', name: 'Kyrgyz', native: 'Кыргызча' },
+    { code: 'uz', name: 'Uzbek', native: 'Oʻzbek' },
+    { code: 'mn', name: 'Mongolian', native: 'Монгол' },
+    { code: 'be', name: 'Belarusian', native: 'Беларуская' },
+    { code: 'et', name: 'Estonian', native: 'Eesti' },
+    { code: 'lv', name: 'Latvian', native: 'Latviešu' },
+    { code: 'lt', name: 'Lithuanian', native: 'Lietuvių' },
+    { code: 'is', name: 'Icelandic', native: 'Íslenska' },
+    { code: 'ga', name: 'Irish', native: 'Gaeilge' },
+    { code: 'cy', name: 'Welsh', native: 'Cymraeg' },
+    { code: 'mt', name: 'Maltese', native: 'Malti' },
+    { code: 'eu', name: 'Basque', native: 'Euskara' },
+    { code: 'ca', name: 'Catalan', native: 'Català' },
+    { code: 'gl', name: 'Galician', native: 'Galego' },
+    { code: 'sq', name: 'Albanian', native: 'Shqip' },
+    { code: 'mk', name: 'Macedonian', native: 'Македонски' },
+    { code: 'bs', name: 'Bosnian', native: 'Bosanski' },
+    { code: 'es-co', name: 'Spanish (Colombia)', native: 'Español (Colombia)' },
+    { code: 'es-mx', name: 'Mexican Spanish', native: 'Español (México)' }
+  ];
+  
   // Chat Tab Component
   const ChatTab = {
     currentModel: null,
+    isLoadingConversation: false,
     lastUserMessage: null, // Store last user message for regeneration
     currentConversationId: null,
     pendingAttachments: [],
@@ -284,34 +367,25 @@
                       <button class="sider-image-action-btn" data-action="math-solver" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
                         Math Solver
                       </button>
-                      <button class="sider-image-action-btn" data-action="translate-image" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 4px; position: relative;">
-                        <span class="sider-translate-text">Translate</span>
-                        <svg class="sider-translate-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer;">
-                          <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                        <div class="sider-translate-language-dropdown" id="sider-translate-language-dropdown" style="display: none;">
-                          <div class="sider-translate-language-list">
-                            <div class="sider-translate-language-item" data-lang="en">English</div>
-                            <div class="sider-translate-language-item" data-lang="es">Spanish</div>
-                            <div class="sider-translate-language-item" data-lang="fr">French</div>
-                            <div class="sider-translate-language-item" data-lang="de">German</div>
-                            <div class="sider-translate-language-item" data-lang="it">Italian</div>
-                            <div class="sider-translate-language-item" data-lang="pt">Portuguese</div>
-                            <div class="sider-translate-language-item" data-lang="ru">Russian</div>
-                            <div class="sider-translate-language-item" data-lang="ja">Japanese</div>
-                            <div class="sider-translate-language-item" data-lang="ko">Korean</div>
-                            <div class="sider-translate-language-item" data-lang="zh">Chinese</div>
-                            <div class="sider-translate-language-item" data-lang="ar">Arabic</div>
-                            <div class="sider-translate-language-item" data-lang="hi">Hindi</div>
-                            <div class="sider-translate-language-item" data-lang="nl">Dutch</div>
-                            <div class="sider-translate-language-item" data-lang="pl">Polish</div>
-                            <div class="sider-translate-language-item" data-lang="tr">Turkish</div>
-                            <div class="sider-translate-language-item" data-lang="vi">Vietnamese</div>
-                            <div class="sider-translate-language-item" data-lang="th">Thai</div>
-                            <div class="sider-translate-language-item" data-lang="id">Indonesian</div>
+                      <div class="sider-image-translate-wrapper" style="position: relative; display: inline-block;">
+                        <button class="sider-image-action-btn" id="sider-image-translate-btn" data-action="translate-image" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                          <span class="sider-translate-text">Translate</span>
+                          <svg class="sider-translate-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer;">
+                            <polyline points="6 9 12 15 18 9"/>
+                          </svg>
+                        </button>
+                        <div class="sider-language-dropdown-menu" id="sider-image-translate-language-dropdown-menu" style="display: none;">
+                          <div class="sider-language-search-container">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sider-language-search-icon">
+                              <circle cx="11" cy="11" r="8"/>
+                              <path d="m21 21-4.35-4.35"/>
+                            </svg>
+                            <input type="text" class="sider-language-search-input" id="sider-image-translate-language-search-input" placeholder="Search" />
                           </div>
+                          <div class="sider-language-list" id="sider-image-translate-language-list"></div>
                         </div>
-                      </button>
+                        <input type="hidden" id="sider-image-translate-language-select" value="en" />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1359,23 +1433,23 @@
       } else {
         // Get model icon for assistant
         const iconMap = {
-          'gpt-4o-mini': chrome.runtime.getURL('icons/chatgpt.png'),
-          'Sider Fusion': chrome.runtime.getURL('icons/fusion.png'),
-          'GPT-5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
-          'Cloude Haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Flash': chrome.runtime.getURL('icons/gemini.png'),
-          'GPT-5': chrome.runtime.getURL('icons/chatgpt.png'),
-          'GPT-4.0': chrome.runtime.getURL('icons/chatgpt.png'),
-          'DeepSeek V3.1': chrome.runtime.getURL('icons/deepseek.png'),
-          'Cloude Sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
-          'Gemini 2.5 Pro': chrome.runtime.getURL('icons/gemini.png'),
-          'Grok 4': chrome.runtime.getURL('icons/grok.png'),
-          'claude-3.5-haiku': chrome.runtime.getURL('icons/claude.png'),
-          'kimi-k2': chrome.runtime.getURL('icons/kimi.png'),
-          'deepseek-v3': chrome.runtime.getURL('icons/deepseek.png'),
-          'claude-3.7-sonnet': chrome.runtime.getURL('icons/claude.png'),
-          'claude-sonnet-4': chrome.runtime.getURL('icons/claude.png'),
-          'claude-opus-4.1': chrome.runtime.getURL('icons/claude.png'),
+          'webby fusion': chrome.runtime.getURL('icons/fusion.png'),
+          'gpt -5 mini': chrome.runtime.getURL('icons/gpt_5mini.png'),
+          'claude haiku 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 flash': chrome.runtime.getURL('icons/gemini.png'),
+          'gpt -5': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -4.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'gpt -5.1': chrome.runtime.getURL('icons/chatgpt.png'),
+          'deepseek v3.1': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude sonnet 4.5': chrome.runtime.getURL('icons/claude.png'),
+          'gemini 2.5 pro': chrome.runtime.getURL('icons/gemini.png'),
+          'grok 4': chrome.runtime.getURL('icons/grok.png'),
+          'claude 3.5 haiku': chrome.runtime.getURL('icons/claude.png'),
+          'kimi k2': chrome.runtime.getURL('icons/kimi.png'),
+          'deepseek v3': chrome.runtime.getURL('icons/deepseek.png'),
+          'claude 3.7 sonnet': chrome.runtime.getURL('icons/claude.png'),
+          'claude sonnet 4': chrome.runtime.getURL('icons/claude.png'),
+          'claude opus 4.1': chrome.runtime.getURL('icons/claude.png'),
           'chatgpt': chrome.runtime.getURL('icons/fusion.png'),
           'gpt4': chrome.runtime.getURL('icons/chatgpt.png'),
           'gemini': chrome.runtime.getURL('icons/gemini.png'),
@@ -2417,154 +2491,14 @@
         this.uploadImageToServer(src, alt, imageWrapper);
         
         const imageActionBtns = imagePreviewSection.querySelectorAll('.sider-image-action-btn');
+        let translateImageBtnFound = false;
+        
         imageActionBtns.forEach(btn => {
           const action = btn.getAttribute('data-action');
           
-          // Special handling for translate button with arrow
+          // Skip translate-image button - it's handled by initImageTranslateLanguageDropdown
           if (action === 'translate-image') {
-            const translateText = btn.querySelector('.sider-translate-text');
-            const translateArrow = btn.querySelector('.sider-translate-arrow');
-            const languageDropdown = btn.querySelector('.sider-translate-language-dropdown');
-            
-            // Prevent default button click behavior
-            btn.onclick = (e) => {
-              // If clicking on arrow, don't trigger translate action
-              if (e.target === translateArrow || translateArrow.contains(e.target)) {
-                return;
-              }
-              // If clicking on dropdown, don't trigger translate action
-              if (languageDropdown && (e.target === languageDropdown || languageDropdown.contains(e.target))) {
-                return;
-              }
-              
-              // Otherwise, trigger translate action
-              e.stopPropagation();
-              const allImages = Array.from(imagesContainer.querySelectorAll('.sider-image-preview-item')).map(item => ({
-                src: item.getAttribute('data-image-src'),
-                alt: item.getAttribute('data-image-alt'),
-                fileId: item.getAttribute('data-file-id'),
-                fileUrl: item.getAttribute('data-file-url')
-              }));
-              this.handleImageAction(action, allImages.length === 1 ? allImages[0].src : allImages, allImages.length === 1 ? allImages[0].alt : 'Images');
-            };
-            
-            // Handle click on translate text (main button) - trigger translate action
-            if (translateText) {
-              translateText.onclick = (e) => {
-                e.stopPropagation();
-                const allImages = Array.from(imagesContainer.querySelectorAll('.sider-image-preview-item')).map(item => ({
-                  src: item.getAttribute('data-image-src'),
-                  alt: item.getAttribute('data-image-alt'),
-                  fileId: item.getAttribute('data-file-id'),
-                  fileUrl: item.getAttribute('data-file-url')
-                }));
-                this.handleImageAction(action, allImages.length === 1 ? allImages[0].src : allImages, allImages.length === 1 ? allImages[0].alt : 'Images');
-              };
-            }
-            
-            // Handle click on arrow - toggle dropdown
-            if (translateArrow && languageDropdown) {
-              translateArrow.onclick = (e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                const isVisible = languageDropdown.style.display !== 'none';
-                
-                // Close all other dropdowns first
-                document.querySelectorAll('.sider-translate-language-dropdown').forEach(dropdown => {
-                  if (dropdown !== languageDropdown) {
-                    dropdown.style.display = 'none';
-                  }
-                });
-                
-                if (!isVisible) {
-                  // Calculate position for fixed dropdown
-                  const buttonRect = btn.getBoundingClientRect();
-                  const dropdownMaxHeight = 300; // max-height
-                  const spaceAbove = buttonRect.top;
-                  const spaceBelow = window.innerHeight - buttonRect.bottom;
-                  
-                  let top, maxHeight;
-                  
-                  // Position above the button if there's enough space, otherwise below
-                  if (spaceAbove >= dropdownMaxHeight + 8) {
-                    // Position above
-                    top = buttonRect.top - dropdownMaxHeight - 4;
-                    maxHeight = dropdownMaxHeight;
-                  } else if (spaceAbove >= 200) {
-                    // Position above with reduced height
-                    top = 4;
-                    maxHeight = spaceAbove - 8;
-                  } else {
-                    // Position below if not enough space above
-                    top = buttonRect.bottom + 4;
-                    maxHeight = Math.min(dropdownMaxHeight, spaceBelow - 8);
-                  }
-                  
-                  // Ensure dropdown doesn't go off-screen
-                  const dropdownWidth = 180; // min-width
-                  let left = buttonRect.left;
-                  
-                  // Adjust if dropdown would go off right edge
-                  if (left + dropdownWidth > window.innerWidth - 8) {
-                    left = window.innerWidth - dropdownWidth - 8;
-                  }
-                  
-                  // Ensure minimum left margin
-                  if (left < 8) {
-                    left = 8;
-                  }
-                  
-                  languageDropdown.style.top = `${top}px`;
-                  languageDropdown.style.left = `${left}px`;
-                  languageDropdown.style.maxHeight = `${maxHeight}px`;
-                  languageDropdown.style.minWidth = `${Math.max(dropdownWidth, buttonRect.width)}px`;
-                  languageDropdown.style.display = 'block';
-                } else {
-                  languageDropdown.style.display = 'none';
-                }
-              };
-            }
-            
-            // Handle language selection
-            if (languageDropdown) {
-              const languageItems = languageDropdown.querySelectorAll('.sider-translate-language-item');
-              const input = document.getElementById('sider-chat-input');
-              
-              languageItems.forEach(item => {
-                item.onclick = (e) => {
-                  e.stopPropagation();
-                  const langCode = item.getAttribute('data-lang');
-                  const langName = item.getAttribute('data-lang-name') || item.textContent.trim() || 'English';
-                  
-                  // Update selected language
-                  this.selectedTranslateLanguage = langCode;
-                  
-                  // Update UI - mark selected item
-                  languageItems.forEach(li => li.classList.remove('selected'));
-                  item.classList.add('selected');
-                  
-                  // Populate input field with translation prompt
-                  if (input) {
-                    input.value = `Translate all text in this image to ${langName}`;
-                    this.autoResize(input);
-                    if (window.toggleMicSendButton) window.toggleMicSendButton();
-                    input.focus();
-                  }
-                  
-                  // Close dropdown
-                  languageDropdown.style.display = 'none';
-                  
-                  // Save preference
-                  chrome.storage.local.set({ sider_translate_language: langCode });
-                };
-              });
-              
-              // Mark default selected language
-              const defaultItem = languageDropdown.querySelector(`[data-lang="${this.selectedTranslateLanguage}"]`);
-              if (defaultItem) {
-                defaultItem.classList.add('selected');
-              }
-            }
+            translateImageBtnFound = true;
           } else {
             // Regular button click handler for other actions
             btn.onclick = (e) => {
@@ -2580,21 +2514,12 @@
           }
         });
         
-        // Close dropdown when clicking outside
-        setTimeout(() => {
-          const handleOutsideClick = (e) => {
-            const translateDropdowns = document.querySelectorAll('.sider-translate-language-dropdown');
-            translateDropdowns.forEach(dropdown => {
-              if (dropdown.style.display !== 'none') {
-                const translateBtn = dropdown.closest('[data-action="translate-image"]');
-                if (translateBtn && !translateBtn.contains(e.target)) {
-                  dropdown.style.display = 'none';
-                }
-              }
-            });
-          };
-          document.addEventListener('click', handleOutsideClick);
-        }, 100);
+        // Initialize language dropdown for translate-image button
+        if (translateImageBtnFound) {
+          setTimeout(() => {
+            this.initImageTranslateLanguageDropdown();
+          }, 100);
+        }
       }
     },
     
@@ -2737,50 +2662,9 @@
           prompt = 'Solve the math problems in this image';
           break;
         case 'translate-image':
-          // Get language name from dropdown or fallback to mapping
-          let langName = 'English';
-          const imagePreviewSection = document.getElementById('sider-image-preview-section');
-          if (imagePreviewSection) {
-            const translateBtn = imagePreviewSection.querySelector('[data-action="translate-image"]');
-            if (translateBtn) {
-              const languageDropdown = translateBtn.querySelector('.sider-translate-language-dropdown');
-              if (languageDropdown) {
-                const selectedItem = languageDropdown.querySelector(`[data-lang="${this.selectedTranslateLanguage}"]`);
-                if (selectedItem) {
-                  langName = selectedItem.getAttribute('data-lang-name') || selectedItem.textContent.trim() || 'English';
-                }
-              }
-            }
-          }
-          
-          // Fallback language mapping if dropdown not found
-          if (langName === 'English') {
-            const langNames = {
-              'en': 'English',
-              'es': 'Spanish',
-              'es-co': 'Spanish (Colombia)',
-              'es-mx': 'Mexican Spanish',
-              'fr': 'French',
-              'de': 'German',
-              'it': 'Italian',
-              'pt': 'Portuguese',
-              'pt-br': 'Brazilian Portuguese',
-              'ru': 'Russian',
-              'ja': 'Japanese',
-              'ko': 'Korean',
-              'zh': 'Chinese',
-              'ar': 'Arabic',
-              'hi': 'Hindi',
-              'nl': 'Dutch',
-              'pl': 'Polish',
-              'tr': 'Turkish',
-              'vi': 'Vietnamese',
-              'th': 'Thai',
-              'id': 'Indonesian'
-            };
-            langName = langNames[this.selectedTranslateLanguage] || 'English';
-          }
-          
+          const langCode = this.selectedTranslateLanguage || 'en';
+          const selectedLang = WORLD_LANGUAGES.find(lang => lang.code === langCode);
+          const langName = selectedLang ? selectedLang.name : 'English';
           prompt = `Translate all text in this image to ${langName}`;
           break;
       }
@@ -2831,6 +2715,369 @@
     },
     
     // Handle selection action
+    // Initialize language dropdown for selection actions
+    initSelectionLanguageDropdown: function() {
+      const translateBtn = document.getElementById('sider-selection-translate-btn');
+      const menu = document.getElementById('sider-selection-language-dropdown-menu');
+      const searchInput = document.getElementById('sider-selection-language-search-input');
+      const languageList = document.getElementById('sider-selection-language-list');
+      const hiddenInput = document.getElementById('sider-selection-translate-language-select');
+      
+      if (!translateBtn || !menu || !searchInput || !languageList || !hiddenInput) return;
+      
+      let selectedLanguage = null;
+      let filteredLanguages = [...WORLD_LANGUAGES];
+      
+      // Render language list
+      const renderLanguages = (languages) => {
+        languageList.innerHTML = '';
+        languages.forEach(lang => {
+          const item = document.createElement('div');
+          item.className = 'sider-language-item';
+          if (selectedLanguage && selectedLanguage.code === lang.code) {
+            item.classList.add('selected');
+          }
+          item.innerHTML = `
+            <div class="sider-language-item-name">${lang.name}</div>
+            <div class="sider-language-item-native">${lang.native}</div>
+          `;
+          item.addEventListener('click', () => {
+            selectLanguage(lang);
+            closeDropdown();
+            // Trigger translate action with selected language
+            const selectedTextDisplay = document.getElementById('sider-selected-text-display');
+            if (selectedTextDisplay && selectedTextDisplay.textContent) {
+              this.handleSelectionAction('translate', selectedTextDisplay.textContent);
+            }
+          });
+          languageList.appendChild(item);
+        });
+      };
+      
+      // Select language
+      const selectLanguage = (lang) => {
+        selectedLanguage = lang;
+        hiddenInput.value = lang.code;
+        this.selectedTranslateLanguage = lang.code;
+        
+        // Update selected state in list
+        languageList.querySelectorAll('.sider-language-item').forEach(item => {
+          item.classList.remove('selected');
+        });
+        const selectedItem = Array.from(languageList.children).find(item => {
+          const nameDiv = item.querySelector('.sider-language-item-name');
+          return nameDiv && nameDiv.textContent === lang.name;
+        });
+        if (selectedItem) {
+          selectedItem.classList.add('selected');
+        }
+      };
+      
+      // Filter languages based on search
+      const filterLanguages = (query) => {
+        const lowerQuery = query.toLowerCase().trim();
+        if (!lowerQuery) {
+          filteredLanguages = [...WORLD_LANGUAGES];
+        } else {
+          filteredLanguages = WORLD_LANGUAGES.filter(lang => 
+            lang.name.toLowerCase().includes(lowerQuery) ||
+            lang.native.toLowerCase().includes(lowerQuery) ||
+            lang.code.toLowerCase().includes(lowerQuery)
+          );
+        }
+        renderLanguages(filteredLanguages);
+      };
+      
+      // Open dropdown
+      const openDropdown = () => {
+        menu.style.display = 'flex';
+        searchInput.focus();
+        renderLanguages(filteredLanguages);
+        
+        // Position dropdown above button
+        const rect = translateBtn.getBoundingClientRect();
+        const menuHeight = 320;
+        const spaceAbove = rect.top;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        
+        if (spaceAbove >= menuHeight + 8) {
+          menu.style.bottom = 'calc(100% + 6px)';
+          menu.style.top = 'auto';
+        } else {
+          menu.style.top = 'auto';
+          menu.style.bottom = 'calc(100% + 6px)';
+          menu.style.maxHeight = `${Math.min(320, spaceAbove - 8)}px`;
+        }
+      };
+      
+      // Close dropdown
+      const closeDropdown = () => {
+        menu.style.display = 'none';
+        searchInput.value = '';
+        filteredLanguages = [...WORLD_LANGUAGES];
+      };
+      
+      // Close dropdown when clicking outside
+      let outsideClickHandler = null;
+      
+      const handleOutsideClick = (e) => {
+        if (!translateBtn.contains(e.target) && !menu.contains(e.target)) {
+          closeDropdown();
+          if (outsideClickHandler) {
+            document.removeEventListener('click', outsideClickHandler);
+            outsideClickHandler = null;
+          }
+        }
+      };
+      
+      // Wrap openDropdown to add outside click listener
+      const wrappedOpenDropdown = () => {
+        openDropdown();
+        setTimeout(() => {
+          if (!outsideClickHandler) {
+            outsideClickHandler = handleOutsideClick;
+            document.addEventListener('click', outsideClickHandler);
+          }
+        }, 0);
+      };
+      
+      // Translate button click handler
+      translateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (menu.style.display === 'none' || !menu.style.display) {
+          wrappedOpenDropdown();
+        } else {
+          closeDropdown();
+          if (outsideClickHandler) {
+            document.removeEventListener('click', outsideClickHandler);
+            outsideClickHandler = null;
+          }
+        }
+      });
+      
+      // Search input handler
+      searchInput.addEventListener('input', (e) => {
+        filterLanguages(e.target.value);
+      });
+      
+      // Prevent closing when clicking inside dropdown
+      menu.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      // Initialize with default selection (English)
+      const defaultLang = WORLD_LANGUAGES.find(lang => lang.code === 'en') || WORLD_LANGUAGES[0];
+      if (defaultLang) {
+        selectLanguage(defaultLang);
+      }
+      
+      renderLanguages(filteredLanguages);
+    },
+    
+    // Initialize language dropdown for image translate button
+    initImageTranslateLanguageDropdown: function() {
+      const translateBtn = document.getElementById('sider-image-translate-btn');
+      const menu = document.getElementById('sider-image-translate-language-dropdown-menu');
+      const searchInput = document.getElementById('sider-image-translate-language-search-input');
+      const languageList = document.getElementById('sider-image-translate-language-list');
+      const hiddenInput = document.getElementById('sider-image-translate-language-select');
+      
+      if (!translateBtn || !menu || !searchInput || !languageList || !hiddenInput) return;
+      
+      let selectedLanguage = null;
+      let filteredLanguages = [...WORLD_LANGUAGES];
+      
+      // Render language list
+      const renderLanguages = (languages) => {
+        languageList.innerHTML = '';
+        languages.forEach(lang => {
+          const item = document.createElement('div');
+          item.className = 'sider-language-item';
+          if (selectedLanguage && selectedLanguage.code === lang.code) {
+            item.classList.add('selected');
+          }
+          item.innerHTML = `
+            <div class="sider-language-item-name">${lang.name}</div>
+            <div class="sider-language-item-native">${lang.native}</div>
+          `;
+          item.addEventListener('click', () => {
+            selectLanguage(lang);
+            closeDropdown();
+            // Trigger translate-image action with selected language
+            const imagePreviewSection = document.getElementById('sider-image-preview-section');
+            if (imagePreviewSection) {
+              const imagesContainer = imagePreviewSection.querySelector('.sider-images-row');
+              if (imagesContainer) {
+                const allImages = Array.from(imagesContainer.querySelectorAll('.sider-image-preview-item')).map(item => ({
+                  src: item.getAttribute('data-image-src'),
+                  alt: item.getAttribute('data-image-alt'),
+                  fileId: item.getAttribute('data-file-id'),
+                  fileUrl: item.getAttribute('data-file-url')
+                }));
+                if (allImages.length > 0) {
+                  this.handleImageAction('translate-image', allImages.length === 1 ? allImages[0].src : allImages, allImages.length === 1 ? allImages[0].alt : 'Images');
+                }
+              }
+            }
+          });
+          languageList.appendChild(item);
+        });
+      };
+      
+      // Select language
+      const selectLanguage = (lang) => {
+        selectedLanguage = lang;
+        hiddenInput.value = lang.code;
+        this.selectedTranslateLanguage = lang.code;
+        
+        // Update selected state in list
+        languageList.querySelectorAll('.sider-language-item').forEach(item => {
+          item.classList.remove('selected');
+        });
+        const selectedItem = Array.from(languageList.children).find(item => {
+          const nameDiv = item.querySelector('.sider-language-item-name');
+          return nameDiv && nameDiv.textContent === lang.name;
+        });
+        if (selectedItem) {
+          selectedItem.classList.add('selected');
+        }
+        
+        // Save preference
+        chrome.storage.local.set({ sider_translate_language: lang.code });
+      };
+      
+      // Filter languages based on search
+      const filterLanguages = (query) => {
+        const lowerQuery = query.toLowerCase().trim();
+        if (!lowerQuery) {
+          filteredLanguages = [...WORLD_LANGUAGES];
+        } else {
+          filteredLanguages = WORLD_LANGUAGES.filter(lang => 
+            lang.name.toLowerCase().includes(lowerQuery) ||
+            lang.native.toLowerCase().includes(lowerQuery) ||
+            lang.code.toLowerCase().includes(lowerQuery)
+          );
+        }
+        renderLanguages(filteredLanguages);
+      };
+      
+      // Open dropdown
+      const openDropdown = () => {
+        menu.style.display = 'flex';
+        searchInput.focus();
+        renderLanguages(filteredLanguages);
+        
+        // Position dropdown above button (fixed positioning)
+        const rect = translateBtn.getBoundingClientRect();
+        const menuHeight = 320;
+        const spaceAbove = rect.top;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        
+        let top, maxHeight;
+        
+        // Position above the button if there's enough space, otherwise below
+        if (spaceAbove >= menuHeight + 8) {
+          top = rect.top - menuHeight - 4;
+          maxHeight = menuHeight;
+        } else if (spaceAbove >= 200) {
+          top = 4;
+          maxHeight = spaceAbove - 8;
+        } else {
+          top = rect.bottom + 4;
+          maxHeight = Math.min(menuHeight, spaceBelow - 8);
+        }
+        
+        // Ensure dropdown doesn't go off-screen
+        const dropdownWidth = 200;
+        let left = rect.left;
+        
+        if (left + dropdownWidth > window.innerWidth - 8) {
+          left = window.innerWidth - dropdownWidth - 8;
+        }
+        
+        if (left < 8) {
+          left = 8;
+        }
+        
+        menu.style.position = 'fixed';
+        menu.style.top = `${top}px`;
+        menu.style.left = `${left}px`;
+        menu.style.maxHeight = `${maxHeight}px`;
+        menu.style.minWidth = `${Math.max(dropdownWidth, rect.width)}px`;
+        menu.style.bottom = 'auto';
+      };
+      
+      // Close dropdown
+      const closeDropdown = () => {
+        menu.style.display = 'none';
+        searchInput.value = '';
+        filteredLanguages = [...WORLD_LANGUAGES];
+      };
+      
+      // Close dropdown when clicking outside
+      let outsideClickHandler = null;
+      
+      const handleOutsideClick = (e) => {
+        if (!translateBtn.contains(e.target) && !menu.contains(e.target)) {
+          closeDropdown();
+          if (outsideClickHandler) {
+            document.removeEventListener('click', outsideClickHandler);
+            outsideClickHandler = null;
+          }
+        }
+      };
+      
+      // Wrap openDropdown to add outside click listener
+      const wrappedOpenDropdown = () => {
+        openDropdown();
+        setTimeout(() => {
+          if (!outsideClickHandler) {
+            outsideClickHandler = handleOutsideClick;
+            document.addEventListener('click', outsideClickHandler);
+          }
+        }, 0);
+      };
+      
+      // Translate button click handler
+      translateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other dropdowns first
+        document.querySelectorAll('.sider-language-dropdown-menu').forEach(dropdown => {
+          if (dropdown !== menu && dropdown.style.display !== 'none') {
+            dropdown.style.display = 'none';
+          }
+        });
+        
+        if (menu.style.display === 'none' || !menu.style.display) {
+          wrappedOpenDropdown();
+        } else {
+          closeDropdown();
+          if (outsideClickHandler) {
+            document.removeEventListener('click', outsideClickHandler);
+            outsideClickHandler = null;
+          }
+        }
+      });
+      
+      // Search input handler
+      searchInput.addEventListener('input', (e) => {
+        filterLanguages(e.target.value);
+      });
+      
+      // Prevent closing when clicking inside dropdown
+      menu.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      // Initialize with default selection (English)
+      const defaultLang = WORLD_LANGUAGES.find(lang => lang.code === 'en') || WORLD_LANGUAGES[0];
+      if (defaultLang) {
+        selectLanguage(defaultLang);
+      }
+      
+      renderLanguages(filteredLanguages);
+    },
+    
     handleSelectionAction: function(action, text) {
       if (!text) return;
       
@@ -2844,7 +3091,10 @@
           prompt = `Explain this text: "${text}"`;
           break;
         case 'translate':
-          prompt = `Translate to English: "${text}"`;
+          const langCode = this.selectedTranslateLanguage || 'en';
+          const selectedLang = WORLD_LANGUAGES.find(lang => lang.code === langCode);
+          const langName = selectedLang ? selectedLang.name : 'English';
+          prompt = `Translate to ${langName}: "${text}"`;
           break;
         case 'summarize':
           prompt = `Summarize this text: "${text}"`;
@@ -3301,7 +3551,7 @@
       // Selection action buttons
       const actionButtons = document.querySelectorAll('.sider-selection-actions .sider-action-btn');
       actionButtons.forEach(btn => {
-        if (btn.id !== 'sider-more-actions-btn') {
+        if (btn.id !== 'sider-more-actions-btn' && btn.id !== 'sider-selection-translate-btn') {
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const action = btn.getAttribute('data-action');
@@ -3312,6 +3562,9 @@
           });
         }
       });
+      
+      // Initialize language dropdown for translate button
+      this.initSelectionLanguageDropdown();
       
       // More actions button
       const moreActionsBtn = document.getElementById('sider-more-actions-btn');
@@ -3417,6 +3670,41 @@
       this.messageListenerSetup = true;
       
       // Listen for screenshot and chat with image from content script
+      // Listen for custom event from toolbar when text is selected
+      window.addEventListener('sider:text-selected', (event) => {
+        const text = event.detail?.text;
+        if (!text) return;
+        
+        // Ensure we're on the chat tab
+        if (window.switchToTab && typeof window.switchToTab === 'function') {
+          window.switchToTab('chat');
+        } else if (window.SiderChatTab && window.SiderChatTab.switchToChat) {
+          window.SiderChatTab.switchToChat();
+        }
+        
+        // Wait a bit for tab to switch, then show selected text
+        setTimeout(() => {
+          const selectedTextSection = document.getElementById('sider-selected-text-section');
+          const selectedTextDisplay = document.getElementById('sider-selected-text-display');
+          const removeSelectionBtn = document.getElementById('sider-remove-selection-btn');
+          const input = document.getElementById('sider-chat-input');
+          
+          if (selectedTextSection && selectedTextDisplay && input) {
+            selectedTextDisplay.textContent = text;
+            selectedTextSection.style.display = 'block';
+            
+            if (removeSelectionBtn) {
+              removeSelectionBtn.onclick = () => {
+                selectedTextSection.style.display = 'none';
+                input.value = '';
+                this.autoResize(input);
+                if (window.toggleMicSendButton) window.toggleMicSendButton();
+              };
+            }
+          }
+        }, 200);
+      });
+
       chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (request.type === 'SCREENSHOT_CAPTURED' && request.dataUrl) {
           // Check if OCR is open
@@ -3503,6 +3791,14 @@
             }
           }, 200);
           return false;
+        } else if (request.type === 'LOAD_CONVERSATION' && request.conversationId) {
+          // Load existing conversation instead of creating a new one
+          if (window.SiderChatTab && typeof window.SiderChatTab.loadConversation === 'function') {
+            window.SiderChatTab.loadConversation(request.conversationId);
+          } else {
+            console.error('SiderChatTab.loadConversation not available');
+          }
+          return false;
         } else if (request.type === 'TEXT_SELECTED' && request.text) {
           // Ensure we're on the chat tab
           if (window.switchToTab && typeof window.switchToTab === 'function') {
@@ -3534,7 +3830,7 @@
               }
               
               actionButtons.forEach(btn => {
-                if (btn.id !== 'sider-more-actions-btn') {
+                if (btn.id !== 'sider-more-actions-btn' && btn.id !== 'sider-selection-translate-btn') {
                   btn.onclick = (e) => {
                     e.stopPropagation();
                     const action = btn.getAttribute('data-action');
@@ -3544,6 +3840,9 @@
                   };
                 }
               });
+              
+              // Initialize language dropdown for translate button
+              this.initSelectionLanguageDropdown();
               
               if (moreActionsBtn) {
                 moreActionsBtn.onclick = (e) => {
@@ -4071,6 +4370,20 @@
     loadConversation: async function(conversationId) {
       console.log('Loading conversation:', conversationId);
       
+      // Prevent duplicate calls
+      if (this.isLoadingConversation) {
+        console.log('Already loading a conversation, skipping duplicate call');
+        return;
+      }
+      
+      // Check if we're already viewing this conversation
+      if (this.currentConversationId === conversationId) {
+        console.log('Conversation already loaded:', conversationId);
+        return;
+      }
+      
+      this.isLoadingConversation = true;
+      
       // Close history modal
       this.closeChatHistory();
       
@@ -4092,6 +4405,7 @@
           if (messagesContainer) {
             messagesContainer.innerHTML = '<div style="padding: 40px; text-align: center; color: #ef4444;">Error: Chat service not available</div>';
           }
+          this.isLoadingConversation = false;
           return;
         }
         
@@ -4102,6 +4416,7 @@
           if (messagesContainer) {
             messagesContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error: ${result.error || 'Failed to load conversation'}</div>`;
           }
+          this.isLoadingConversation = false;
           return;
         }
         
@@ -4295,7 +4610,8 @@
               
               if (content) {
                 const escapedContent = this.escapeHtml(content);
-                this.addMessage('user', escapedContent);
+                const imageUrl = message.image_url || null;
+                this.addMessage('user', escapedContent, false, imageUrl);
               }
             } else if (grouped.type === 'assistant') {
               // Render assistant message with versions
@@ -4342,12 +4658,14 @@
         }
         
         console.log('✅ Conversation loaded successfully:', conversationId);
+        this.isLoadingConversation = false;
         
       } catch (error) {
         console.error('Error loading conversation:', error);
         if (messagesContainer) {
           messagesContainer.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444;">Error loading conversation: ${error.message}</div>`;
         }
+        this.isLoadingConversation = false;
       }
     },
     

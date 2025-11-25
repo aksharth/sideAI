@@ -1,12 +1,15 @@
 (function() {
   'use strict';
 
-  // Get API base URL from storage or use default
+  // Use extension API config
   const getApiBaseUrl = () => {
+    if (window.SiderExtensionAPI) {
+      return window.SiderExtensionAPI.getBaseUrl();
+    }
+    // Fallback if extension_api.js is not loaded
     return new Promise((resolve) => {
       chrome.storage.sync.get(['sider_api_base_url'], (result) => {
         let baseUrl = result.sider_api_base_url || 'https://webby-sider-backend-175d47f9225b.herokuapp.com';
-        // Remove /docs if present
         baseUrl = baseUrl.replace(/\/docs\/?$/, '');
         resolve(baseUrl);
       });
@@ -47,13 +50,16 @@
         if (options.app_version !== undefined) formData.append('app_version', options.app_version || '');
         if (options.type !== undefined) formData.append('type', options.type || '');
 
-        const response = await fetch(`${baseUrl}/api/uploader/v1/file/upload-directly`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.uploader?.upload || '/api/uploader/v1/file/upload-directly') : `${baseUrl}/api/uploader/v1/file/upload-directly`;
+        const headers = api.getUploadHeaders ? await api.getUploadHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-            // Don't set Content-Type header - browser will set it with boundary for FormData
-          },
+          headers,
           body: formData
         });
 
@@ -123,12 +129,16 @@
         }
 
         // Try to get file info from uploader API
-        const response = await fetch(`${baseUrl}/api/uploader/v1/file/${fileId}`, {
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl(api.endpoints?.uploader?.getFile(fileId) || `/api/uploader/v1/file/${fileId}`) : `${baseUrl}/api/uploader/v1/file/${fileId}`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
           method: 'GET',
-          headers: {
-            'accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
+          headers
         });
 
         if (response.ok) {
@@ -208,34 +218,52 @@
         }
         
         // Check if custom endpoint is configured in storage
+        const api = window.SiderExtensionAPI || {};
         let customEndpoint = null;
-        try {
-          const storageResult = await new Promise((resolve) => {
-            chrome.storage.sync.get(['sider_image_to_text_endpoint'], (result) => {
-              resolve(result.sider_image_to_text_endpoint);
-            });
-          });
-          if (storageResult) {
-            customEndpoint = storageResult.startsWith('http') ? storageResult : `${baseUrl}${storageResult.startsWith('/') ? '' : '/'}${storageResult}`;
+        
+        if (api.getCustomEndpoint) {
+          const customEndpointPath = await api.getCustomEndpoint('sider_image_to_text_endpoint');
+          if (customEndpointPath) {
+            const baseUrl = await getApiBaseUrl();
+            customEndpoint = customEndpointPath.startsWith('http') ? customEndpointPath : `${baseUrl}${customEndpointPath.startsWith('/') ? '' : '/'}${customEndpointPath}`;
             console.log('🔧 Using custom endpoint from storage:', customEndpoint);
           }
-        } catch (e) {
-          // Ignore storage errors
+        } else {
+          try {
+            const storageResult = await new Promise((resolve) => {
+              chrome.storage.sync.get(['sider_image_to_text_endpoint'], (result) => {
+                resolve(result.sider_image_to_text_endpoint);
+              });
+            });
+            if (storageResult) {
+              const baseUrl = await getApiBaseUrl();
+              customEndpoint = storageResult.startsWith('http') ? storageResult : `${baseUrl}${storageResult.startsWith('/') ? '' : '/'}${storageResult}`;
+              console.log('🔧 Using custom endpoint from storage:', customEndpoint);
+            }
+          } catch (e) {
+            // Ignore storage errors
+          }
         }
         
         // Try multiple endpoint path variations
         // Prioritize the known working endpoint (to-text with hyphen) first
-        const endpoints = customEndpoint 
-          ? [customEndpoint] // If custom endpoint is set, try only that
-          : [
-              `${baseUrl}/api/images/to-text`,     // With hyphen - known working endpoint (returns 500, not 404)
-              `${baseUrl}/api/images/v1/to_text`,  // With version like other endpoints
-              `${baseUrl}/api/images/to_text`,     // Plural without version
-              `${baseUrl}/api/images/image_to_text`, // Full name
-              `${baseUrl}/api/image/to_text`,      // Singular without version
-              `${baseUrl}/api/image/v1/to_text`,   // Singular with version
-              `${baseUrl}/api/images/v1/image_to_text` // Full name with version
-            ];
+        let endpoints;
+        if (customEndpoint) {
+          endpoints = [customEndpoint]; // If custom endpoint is set, try only that
+        } else if (api.getImageToTextEndpoints) {
+          endpoints = await api.getImageToTextEndpoints();
+        } else {
+          const baseUrl = await getApiBaseUrl();
+          endpoints = [
+            `${baseUrl}/api/images/to-text`,
+            `${baseUrl}/api/images/v1/to_text`,
+            `${baseUrl}/api/images/to_text`,
+            `${baseUrl}/api/images/image_to_text`,
+            `${baseUrl}/api/image/to_text`,
+            `${baseUrl}/api/image/v1/to_text`,
+            `${baseUrl}/api/images/v1/image_to_text`
+          ];
+        }
         
         console.log('🔍 Trying image-to-text endpoints:', endpoints);
         
@@ -249,13 +277,15 @@
               body: requestBody
             });
 
+            const headers = api.getHeaders ? await api.getHeaders() : {
+              'accept': 'application/json',
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            };
+
             const response = await fetch(endpoint, {
               method: 'POST',
-              headers: {
-                'accept': 'application/json',
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`
-              },
+              headers,
               body: JSON.stringify(requestBody)
             });
 

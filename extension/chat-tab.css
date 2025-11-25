@@ -2229,3 +2229,131 @@
   transform: scale(0.98);
 }
 
+/* Language Dropdown Menu for Selection Actions */
+.sider-translate-button-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Language Dropdown Menu for Image Translate */
+.sider-image-translate-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.sider-language-dropdown-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 200px;
+}
+
+.sider-language-search-container {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sider-language-search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sider-language-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.sider-language-search-input:focus {
+  background: #ffffff;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.sider-language-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.sider-language-list {
+  overflow-y: auto;
+  max-height: 240px;
+  padding: 4px 0;
+}
+
+.sider-language-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
+.sider-language-item:hover {
+  background-color: rgba(124, 58, 237, 0.08);
+}
+
+.sider-language-item.selected {
+  background-color: rgba(124, 58, 237, 0.15);
+}
+
+.sider-language-item.selected .sider-language-item-name {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.sider-language-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.sider-language-item-native {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.sider-language-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sider-language-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sider-language-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.sider-language-list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+

@@ -50,7 +50,7 @@
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -75,13 +75,13 @@
     gap: 3px;
     max-width: calc(100vw - 10px);
   }
-  
+
   .sider-pin-btn {
     width: 24px;
     height: 24px;
     font-size: 14px;
   }
-  
+
   .sider-selection-btn {
     width: 28px;
     height: 28px;
@@ -96,7 +96,7 @@
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 6px 0;
   z-index: 2147483647;
   overflow: hidden;
@@ -249,6 +249,7 @@
     opacity: 0;
     transform: translateX(-50%) translateY(-5px);
   }
+
   to {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -261,3 +262,510 @@
 
 /* Hide native tooltip - handled by JavaScript */
 
+/* Action Popup Styles - Updated to match sider.ai design */
+.sider-action-popup {
+  position: fixed;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  max-height: 90vh;
+}
+
+.sider-action-popup.dragging {
+  transition: none;
+  user-select: none;
+}
+
+.sider-action-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #ffffff;
+  flex-shrink: 0;
+  cursor: move;
+  user-select: none;
+}
+
+.sider-action-popup-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  line-height: 1.4;
+  flex: 1;
+  cursor: move;
+}
+
+.sider-action-popup-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sider-action-popup-pin-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  line-height: 1;
+  padding: 0;
+  background: transparent;
+  color: #6b7280;
+  user-select: none;
+}
+
+.sider-action-popup-pin-btn:hover {
+  background: #f3f4f6;
+}
+
+/* Unpinned state - grey outlined/muted */
+.sider-action-popup-pin-btn:not(.pinned) {
+  opacity: 0.5;
+  filter: grayscale(1) brightness(1.1);
+  color: #9ca3af !important;
+  font-weight: normal;
+}
+
+.sider-action-popup-pin-btn:not(.pinned):hover {
+  opacity: 0.8;
+  filter: grayscale(0.8);
+  background: #f9fafb;
+}
+
+/* Pinned state - purple solid */
+.sider-action-popup-pin-btn.active {
+  opacity: 1;
+  filter: none;
+  color: #7c3aed !important;
+  font-weight: bold;
+  background: rgba(124, 58, 237, 0.15);
+  transform: scale(1.05);
+}
+
+.sider-action-popup-close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #6b7280;
+  transition: all 0.2s;
+  padding: 0;
+  user-select: none;
+}
+
+.sider-action-popup-close-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.sider-action-popup-close-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sider-action-popup-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 150px;
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
+}
+
+.sider-action-popup-input {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: #f9fafb;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  line-height: 1.5;
+  transition: all 0.2s;
+}
+
+.sider-action-popup-input:focus {
+  outline: none;
+  border-color: #7c3aed;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.sider-action-popup-input:read-only {
+  cursor: default;
+}
+
+.sider-action-popup-response {
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  min-height: 80px;
+  max-height: 250px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sider-action-popup-response.loading {
+  color: #6b7280;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sider-action-popup-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.sider-action-popup-attribution {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  width: 100%;
+}
+
+.sider-action-popup-model-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #6b7280;
+}
+
+
+.sider-action-popup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sider-action-popup-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sider-action-popup-icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #6b7280;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.sider-action-popup-icon-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.sider-action-popup-icon-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sider-action-popup-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sider-action-popup-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.sider-action-popup-btn-primary {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.sider-action-popup-btn-primary:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.sider-action-popup-btn-primary:active {
+  transform: translateY(0);
+}
+
+.sider-action-popup-btn-secondary {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+.sider-action-popup-btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.sider-action-popup-btn-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.sider-action-popup-translate-language {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.sider-action-popup-translate-language span {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.sider-language-dropdown-container {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.sider-language-dropdown-trigger {
+  padding: 8px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  cursor: pointer;
+  color: #111827;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 200px;
+  font-weight: 500;
+}
+
+.sider-language-dropdown-trigger:hover {
+  border-color: #d1d5db;
+}
+
+.sider-language-dropdown-trigger.active {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.sider-language-selected-text {
+  flex: 1;
+  text-align: left;
+}
+
+.sider-language-dropdown-arrow {
+  width: 12px;
+  height: 12px;
+  color: #6b7280;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.sider-language-dropdown-trigger.active .sider-language-dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.sider-language-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 280px;
+}
+
+.sider-language-search-container {
+  position: relative;
+  padding: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sider-language-search-icon {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sider-language-search-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.sider-language-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.sider-language-search-input:focus {
+  background: #ffffff;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+.sider-language-search-input::placeholder {
+  color: #9ca3af;
+}
+
+.sider-language-list {
+  overflow-y: auto;
+  max-height: 240px;
+  padding: 4px 0;
+}
+
+.sider-language-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
+.sider-language-item:hover {
+  background-color: rgba(124, 58, 237, 0.08);
+}
+
+.sider-language-item.selected {
+  background-color: rgba(124, 58, 237, 0.15);
+}
+
+.sider-language-item.selected .sider-language-item-name {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.sider-language-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  line-height: 1.5;
+}
+
+.sider-language-item-native {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.sider-language-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sider-language-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sider-language-list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.sider-language-list::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.sider-action-popup-language-select {
+  display: none;
+}
+
+/* Scrollbar styling for popup */
+.sider-action-popup-body::-webkit-scrollbar,
+.sider-action-popup-response::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sider-action-popup-body::-webkit-scrollbar-track,
+.sider-action-popup-response::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sider-action-popup-body::-webkit-scrollbar-thumb,
+.sider-action-popup-response::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.sider-action-popup-body::-webkit-scrollbar-thumb:hover,
+.sider-action-popup-response::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

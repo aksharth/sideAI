@@ -18,35 +18,24 @@
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="GPT-4o mini" style="width: 20px; height: 20px; object-fit: contain;" />
-                </span>
-                <span class="sider-model-text">
-                  <span class="sider-model-name">GPT-4o mini</span>
-                </span>
-              </span>
-              <input type="radio" name="sider-model" value="gpt-4o-mini" />
-            </label>
-            <label class="sider-model-item">
-              <span class="sider-model-info">
-                <span class="sider-model-icon">
                   <img src="${chrome.runtime.getURL('icons/fusion.png')}" alt="Fusion" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Sider Fusion</span>
+                  <span class="sider-model-name">webby fusion</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Sider Fusion" />
+              <input type="radio" name="sider-model" value="webby fusion" />
             </label>
              <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/gpt_5mini.png')}" alt="GPT-5 mini" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/gpt_5mini.png')}" alt="gpt -5 mini" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">GPT-5 mini</span>
+                  <span class="sider-model-name">gpt -5 mini</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="GPT-5 mini" />
+              <input type="radio" name="sider-model" value="gpt -5 mini" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
@@ -54,21 +43,21 @@
                   <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude Haiku" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Cloude Haiku 4.5</span>
+                  <span class="sider-model-name">claude haiku 4.5</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Cloude Haiku 4.5" />
+              <input type="radio" name="sider-model" value="claude haiku 4.5" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/gemini.png')}" alt="Gemini 2.5 Flash" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/gemini.png')}" alt="gemini 2.5 flash" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Gemini 2.5 Flash</span>
+                  <span class="sider-model-name">gemini 2.5 flash</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Gemini 2.5 Flash" />
+              <input type="radio" name="sider-model" value="gemini 2.5 flash" />
             </label>
           </div>
           <div class="sider-model-section">
@@ -76,36 +65,47 @@
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="GPT-5" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="gpt -5" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">GPT-5</span>
+                  <span class="sider-model-name">gpt -5</span>
                   <span class="sider-model-subtitle">Best for Chat</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="GPT-5" />
+              <input type="radio" name="sider-model" value="gpt -5" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="GPT-4.0" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="gpt -4.1" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">GPT-4.0</span>
+                  <span class="sider-model-name">gpt -4.1</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="GPT-4.0" />
+              <input type="radio" name="sider-model" value="gpt -4.1" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/deepseek.png')}" alt="DeepSeek V3.1" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/chatgpt.png')}" alt="gpt -5.1" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">DeepSeek V3.1</span>
+                  <span class="sider-model-name">gpt -5.1</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="DeepSeek V3.1" />
+              <input type="radio" name="sider-model" value="gpt -5.1" />
+            </label>
+            <label class="sider-model-item">
+              <span class="sider-model-info">
+                <span class="sider-model-icon">
+                  <img src="${chrome.runtime.getURL('icons/deepseek.png')}" alt="deepseek v3.1" style="width: 20px; height: 20px; object-fit: contain;" />
+                </span>
+                <span class="sider-model-text">
+                  <span class="sider-model-name">deepseek v3.1</span>
+                </span>
+              </span>
+              <input type="radio" name="sider-model" value="deepseek v3.1" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
@@ -113,32 +113,32 @@
                   <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude Sonnet" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Cloude Sonnet 4.5</span>
+                  <span class="sider-model-name">claude sonnet 4.5</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Cloude Sonnet 4.5" />
+              <input type="radio" name="sider-model" value="claude sonnet 4.5" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/gemini.png')}" alt="Gemini 2.5 Pro" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/gemini.png')}" alt="gemini 2.5 pro" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Gemini 2.5 Pro</span>
+                  <span class="sider-model-name">gemini 2.5 pro</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Gemini 2.5 Pro" />
+              <input type="radio" name="sider-model" value="gemini 2.5 pro" />
             </label>
             <label class="sider-model-item">
               <span class="sider-model-info">
                 <span class="sider-model-icon">
-                  <img src="${chrome.runtime.getURL('icons/grok.png')}" alt="Grok 4" style="width: 20px; height: 20px; object-fit: contain;" />
+                  <img src="${chrome.runtime.getURL('icons/grok.png')}" alt="grok 4" style="width: 20px; height: 20px; object-fit: contain;" />
                 </span>
                 <span class="sider-model-text">
-                  <span class="sider-model-name">Grok 4</span>
+                  <span class="sider-model-name">grok 4</span>
                 </span>
               </span>
-              <input type="radio" name="sider-model" value="Grok 4" />
+              <input type="radio" name="sider-model" value="grok 4" />
             </label>
             <div class="sider-more-options-item" id="sider-more-options-btn">
               <span class="sider-model-info">
@@ -166,68 +166,68 @@
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude 3.5 Haiku" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="claude 3.5 haiku" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">Claude 3.5 Haiku</span>
+                <span class="sider-model-name">claude 3.5 haiku</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="claude-3.5-haiku" />
+            <input type="radio" name="sider-model" value="claude 3.5 haiku" />
           </label>
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/kimi.png')}" alt="Kimi K2" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/kimi.png')}" alt="kimi k2" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">Kimi K2</span>
+                <span class="sider-model-name">kimi k2</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="kimi-k2" />
+            <input type="radio" name="sider-model" value="kimi k2" />
           </label>
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/deepseek.png')}" alt="DeepSeek V3" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/deepseek.png')}" alt="deepseek v3" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">DeepSeek V3</span>
+                <span class="sider-model-name">deepseek v3</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="deepseek-v3" />
+            <input type="radio" name="sider-model" value="deepseek v3" />
           </label>
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude 3.7 Sonnet" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="claude 3.7 sonnet" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">Claude 3.7 Sonnet</span>
+                <span class="sider-model-name">claude 3.7 sonnet</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="claude-3.7-sonnet" />
+            <input type="radio" name="sider-model" value="claude 3.7 sonnet" />
           </label>
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude Sonnet 4" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="claude sonnet 4" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">Claude Sonnet 4</span>
+                <span class="sider-model-name">claude sonnet 4</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="claude-sonnet-4" />
+            <input type="radio" name="sider-model" value="claude sonnet 4" />
           </label>
           <label class="sider-model-item">
             <span class="sider-model-info">
               <span class="sider-model-icon">
-                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="Claude Opus 4.1" style="width: 20px; height: 20px; object-fit: contain;" />
+                <img src="${chrome.runtime.getURL('icons/claude.png')}" alt="claude opus 4.1" style="width: 20px; height: 20px; object-fit: contain;" />
               </span>
               <span class="sider-model-text">
-                <span class="sider-model-name">Claude Opus 4.1</span>
+                <span class="sider-model-name">claude opus 4.1</span>
               </span>
             </span>
-            <input type="radio" name="sider-model" value="claude-opus-4.1" />
+            <input type="radio" name="sider-model" value="claude opus 4.1" />
           </label>
         </div>
       </div>`;

@@ -26,36 +26,7 @@
         </button>
         <div class="sider-login-header">
           <div class="sider-login-logo">
-            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <!-- Left hemisphere (pink/orange) -->
-              <path d="M50 20 Q30 30 20 50 Q30 70 50 80 Q50 60 50 50 Q50 40 50 20 Z" fill="url(#pinkGradient)"/>
-              <path d="M50 20 Q40 25 35 35 Q30 40 25 50 Q30 60 40 65 Q50 60 50 50 Q50 40 50 20 Z" fill="url(#orangeGradient)"/>
-              <!-- Right hemisphere (blue/purple) -->
-              <path d="M50 20 Q70 30 80 50 Q70 70 50 80 Q50 60 50 50 Q50 40 50 20 Z" fill="url(#blueGradient)"/>
-              <path d="M50 20 Q60 25 65 35 Q70 40 75 50 Q70 60 60 65 Q50 60 50 50 Q50 40 50 20 Z" fill="url(#purpleGradient)"/>
-              <!-- Circuit-like lines -->
-              <path d="M30 40 L40 45 L50 40 L60 45 L70 40" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
-              <path d="M35 55 L45 60 L55 55 L65 60" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
-              <path d="M30 65 L40 70 L50 65 L60 70 L70 65" stroke="#ffffff" stroke-width="1" opacity="0.3"/>
-              <defs>
-                <linearGradient id="pinkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#ec4899;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#f97316;stop-opacity:1" />
-                </linearGradient>
-                <linearGradient id="orangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#fb923c;stop-opacity:1" />
-                </linearGradient>
-                <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                </linearGradient>
-                <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
-                  <stop offset="100%" style="stop-color:#a855f7;stop-opacity:1" />
-                </linearGradient>
-              </defs>
-            </svg>
+            <img src="${chrome.runtime.getURL('icons/sider_logo.png')}" alt="AI Tools" class="sider-ai-tools-icon-login">
           </div>
           <h1 class="sider-login-title" id="sider-login-title">Log in</h1>
           <p class="sider-login-subtitle" id="sider-login-subtitle" style="display: none;"></p>

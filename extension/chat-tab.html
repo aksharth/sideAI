@@ -164,37 +164,25 @@
             <button class="sider-image-action-btn" data-action="math-solver" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap;">
               Math Solver
             </button>
-            <button class="sider-image-action-btn" data-action="translate-image" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 4px; position: relative;">
-              <span class="sider-translate-text">Translate</span>
-              <svg class="sider-translate-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer;">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-              <div class="sider-translate-language-dropdown" id="sider-translate-language-dropdown" style="display: none;">
-                <div class="sider-translate-language-list">
-                  <div class="sider-translate-language-item" data-lang="en" data-lang-name="English">English</div>
-                  <div class="sider-translate-language-item" data-lang="es-co" data-lang-name="Spanish (Colombia)">Spanish (Colombia)</div>
-                  <div class="sider-translate-language-item" data-lang="es" data-lang-name="European Spanish">European Spanish</div>
-                  <div class="sider-translate-language-item" data-lang="es-mx" data-lang-name="Mexican Spanish">Mexican Spanish</div>
-                  <div class="sider-translate-language-item" data-lang="fr" data-lang-name="French">French</div>
-                  <div class="sider-translate-language-item" data-lang="ja" data-lang-name="Japanese">Japanese</div>
-                  <div class="sider-translate-language-item" data-lang="pt" data-lang-name="Portuguese">Portuguese</div>
-                  <div class="sider-translate-language-item" data-lang="pt-br" data-lang-name="Brazilian Portuguese">Brazilian Portuguese</div>
-                  <div class="sider-translate-language-item" data-lang="de" data-lang-name="German">German</div>
-                  <div class="sider-translate-language-item" data-lang="it" data-lang-name="Italian">Italian</div>
-                  <div class="sider-translate-language-item" data-lang="ru" data-lang-name="Russian">Russian</div>
-                  <div class="sider-translate-language-item" data-lang="ko" data-lang-name="Korean">Korean</div>
-                  <div class="sider-translate-language-item" data-lang="zh" data-lang-name="Chinese">Chinese</div>
-                  <div class="sider-translate-language-item" data-lang="ar" data-lang-name="Arabic">Arabic</div>
-                  <div class="sider-translate-language-item" data-lang="hi" data-lang-name="Hindi">Hindi</div>
-                  <div class="sider-translate-language-item" data-lang="nl" data-lang-name="Dutch">Dutch</div>
-                  <div class="sider-translate-language-item" data-lang="pl" data-lang-name="Polish">Polish</div>
-                  <div class="sider-translate-language-item" data-lang="tr" data-lang-name="Turkish">Turkish</div>
-                  <div class="sider-translate-language-item" data-lang="vi" data-lang-name="Vietnamese">Vietnamese</div>
-                  <div class="sider-translate-language-item" data-lang="th" data-lang-name="Thai">Thai</div>
-                  <div class="sider-translate-language-item" data-lang="id" data-lang-name="Indonesian">Indonesian</div>
+            <div class="sider-image-translate-wrapper" style="position: relative; display: inline-block;">
+              <button class="sider-image-action-btn" id="sider-image-translate-btn" data-action="translate-image" style="background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 12px; font-size: 10px; font-weight: 500; color: #111827; cursor: pointer; transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
+                <span class="sider-translate-text">Translate</span>
+                <svg class="sider-translate-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="cursor: pointer;">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <div class="sider-language-dropdown-menu" id="sider-image-translate-language-dropdown-menu" style="display: none;">
+                <div class="sider-language-search-container">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sider-language-search-icon">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                  <input type="text" class="sider-language-search-input" id="sider-image-translate-language-search-input" placeholder="Search" />
                 </div>
+                <div class="sider-language-list" id="sider-image-translate-language-list"></div>
               </div>
-            </button>
+              <input type="hidden" id="sider-image-translate-language-select" value="en" />
+            </div>
           </div>
         </div>
       </div>
@@ -213,12 +201,25 @@
           <button class="sider-action-btn" data-action="explain">
             <span>Explain</span>
           </button>
-          <button class="sider-action-btn" data-action="translate">
-            <span>Translate</span>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
+          <div class="sider-translate-button-wrapper" style="position: relative;">
+            <button class="sider-action-btn" id="sider-selection-translate-btn" data-action="translate">
+              <span>Translate</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <div class="sider-language-dropdown-menu" id="sider-selection-language-dropdown-menu" style="display: none;">
+              <div class="sider-language-search-container">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sider-language-search-icon">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input type="text" class="sider-language-search-input" id="sider-selection-language-search-input" placeholder="Search" />
+              </div>
+              <div class="sider-language-list" id="sider-selection-language-list"></div>
+            </div>
+            <input type="hidden" id="sider-selection-translate-language-select" value="en" />
+          </div>
           <button class="sider-action-btn" id="sider-more-actions-btn">
             <span>...</span>
           </button>

@@ -26,7 +26,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["auth-service.js", "ai-modules.js", "toolbar.js", "image-preview.js", "login-modal.js", "content.js"],
+      "js": ["auth-service.js", "chat-service.js", "ai-modules.js", "toolbar.js", "image-preview.js", "login-modal.js", "content.js"],
       "css": ["ai-modules.css", "toolbar.css", "image-preview.css", "login-modal.css", "content.css"],
       "run_at": "document_idle"
     }
@@ -39,7 +39,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/*.png", "svg/*.svg"],
+      "resources": ["icons/*.png", "svg/*.svg", "toolbar.html"],
       "matches": ["<all_urls>"]
     }
   ]

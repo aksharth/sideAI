@@ -66,14 +66,14 @@
     
     updateModelText: function(model) {
       const modelNames = {
-        'gpt-5-mini': 'GPT-5 mini',
-        'gpt-5': 'GPT-5',
-        'gpt-4.1': 'GPT-4.1'
+        'gpt-5-mini': 'gpt -5 mini',
+        'gpt-5': 'gpt -5',
+        'gpt-4.1': 'gpt -4.1'
       };
       
       const modeText = document.getElementById('sider-grammar-mode-text');
       if (modeText) {
-        modeText.textContent = modelNames[model] || 'GPT-4.1';
+        modeText.textContent = modelNames[model] || 'gpt -4.1';
       }
     },
     

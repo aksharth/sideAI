@@ -556,12 +556,10 @@
           'gpt-5': 'chatgpt.png',
           'gpt-4.1': 'chatgpt.png',
           'deepseek-v3.1': 'deepseek.png',
-          'claude-haiku-4.5-think': 'claude.png',
           'claude-sonnet-4.5': 'claude.png',
           'claude-3.7-sonnet': 'claude.png',
           'claude-sonnet-4': 'claude.png',
           'gemini-2.5-pro': 'gemini.png',
-          'gemini-2.5-flash-think': 'gemini.png',
           'grok-4': 'grok.png'
         };
         
