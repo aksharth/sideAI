@@ -1319,13 +1319,9 @@
   font-size: 12px;
   color: #111827;
   cursor: pointer;
+  border:none;
   transition: all 0.2s;
   white-space: nowrap;
-}
-
-.sider-chat-controls-model-btn:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
 }
 
 .sider-chat-controls-model-btn svg {
@@ -1333,10 +1329,6 @@
   height: 12px;
   color: #6b7280;
   transition: transform 0.2s;
-}
-
-.sider-chat-controls-model-btn:hover svg {
-  transform: translateY(2px);
 }
 
 .sider-chat-controls-model-text {
@@ -1398,7 +1390,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   width: 400px;
-  max-width: 90%;
+  max-width: 75%;
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -1408,14 +1400,14 @@
 }
 
 .sider-generation-model-content {
-  padding: 20px;
+  padding: 15px;
 }
 
 .sider-generation-model-title {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: #111827;
-  margin: 0 0 16px 0;
+  margin: 0 0 5px 0;
   padding: 0;
 }
 
@@ -1426,7 +1418,7 @@
 }
 
 .sider-generation-model-option {
-  padding: 12px;
+  padding: 10px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #ffffff;
@@ -1468,7 +1460,7 @@
 }
 
 .sider-generation-model-subtitle {
-  font-size: 12px;
+  font-size: 10px;
   color: #6b7280;
 }
 

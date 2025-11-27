@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -39,6 +40,7 @@ const sidebarTools = [
 ];
 
 export default function Inpaint() {
+  const searchParams = useSearchParams();
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
   const [cdnURL, setCdnURL] = useState<string | null>(null);
@@ -63,6 +65,15 @@ export default function Inpaint() {
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const imageUrl = searchParams?.get('imageUrl');
+    if (imageUrl) {
+      setUploadedImage(imageUrl);
+      setCdnURL(imageUrl);
+      setFileId('url-provided');
+    }
+  }, [searchParams]);
 
   const handleUserProfileClick = () => {
     if (userProfileButtonRef.current) {

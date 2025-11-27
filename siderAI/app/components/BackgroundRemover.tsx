@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -36,6 +37,7 @@ const sidebarTools = [
 ];
 
 export default function BackgroundRemover() {
+  const searchParams = useSearchParams();
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
   const [cdnURL, setCdnURL] = useState<string | null>(null);
@@ -46,6 +48,16 @@ export default function BackgroundRemover() {
   const [userProfilePosition, setUserProfilePosition] = useState({ top: 0, left: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const userProfileButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const imageUrl = searchParams?.get('imageUrl');
+    if (imageUrl) {
+      setUploadedImage(imageUrl);
+      setCdnURL(imageUrl);
+      // Set a placeholder fileId to enable the confirm button, as the API only needs the URL
+      setFileId('url-provided');
+    }
+  }, [searchParams]);
 
   const handleUserProfileClick = () => {
     if (userProfileButtonRef.current) {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Sparkles,
@@ -39,6 +40,7 @@ const sidebarTools = [
 ];
 
 export default function PhotoEraser() {
+  const searchParams = useSearchParams();
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [fileId, setFileId] = useState<string | null>(null);
   const [cdnURL, setCdnURL] = useState<string | null>(null);
@@ -59,6 +61,15 @@ export default function PhotoEraser() {
   const [imageBounds, setImageBounds] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const userProfileButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const imageUrl = searchParams?.get('imageUrl');
+    if (imageUrl) {
+      setUploadedImage(imageUrl);
+      setCdnURL(imageUrl);
+      setFileId('url-provided');
+    }
+  }, [searchParams]);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);

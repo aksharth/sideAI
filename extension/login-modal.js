@@ -313,34 +313,63 @@
   }
 
   async function handleGoogleLogin() {
-    const loginGoogleBtn = document.getElementById('sider-login-google-btn');
-    if (loginGoogleBtn) {
-      loginGoogleBtn.disabled = true;
-      loginGoogleBtn.innerHTML = '<span>Signing in...</span>';
+    const btn = document.getElementById('sider-login-google-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>Signing in...</span>';
     }
-    
-    // UI only - no authentication logic
+  
     try {
-      // Simulate Google sign-in delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      showLoginSuccess('Welcome! You are now logged in.');
-      
-      setTimeout(() => {
-        hideLoginModal();
-        // Trigger UI update if available
-        if (window.updateUIForAuthStatus) {
-          window.updateUIForAuthStatus();
-        }
-      }, 1000);
-      
-      resetGoogleButton();
-    } catch (error) {
-      console.error('Google login error:', error);
-      showLoginError('Google sign-in failed. Please try again.');
-      resetGoogleButton();
+      // Step 1: ask background.js to do Google OAuth
+      const googleResult = await chrome.runtime.sendMessage({
+        type: 'GOOGLE_OAUTH'
+      });
+  
+      console.log('Login modal: GOOGLE_OAUTH result', googleResult);
+  
+      if (!googleResult || !googleResult.success || !googleResult.token) {
+        showLoginError(googleResult?.error || 'Google login failed');
+        resetGoogleButton();
+        return;
+      }
+  
+      const googleToken = googleResult.token;
+  
+      // Step 2: send token to backend using AuthService.googleSignIn
+      if (!window.SiderAuthService || !window.SiderAuthService.googleSignIn) {
+        throw new Error('Auth service googleSignIn not available');
+      }
+  
+      const result = await window.SiderAuthService.googleSignIn(googleToken);
+      console.log('Backend googleSignIn result:', result);
+  
+      if (result.success) {
+        showLoginSuccess('Welcome, Google sign in successful');
+  
+        setTimeout(() => {
+          hideLoginModal();
+  
+          if (window.updateUIForAuthStatus) {
+            window.updateUIForAuthStatus(true);
+          }
+          if (window.updateProfileIcon) {
+            window.updateProfileIcon(true);
+          }
+          if (window.updateProfileDropdown) {
+            window.updateProfileDropdown(true);
+          }
+        }, 800);
+      } else {
+        showLoginError(result.error || 'Google login failed');
+      }
+    } catch (err) {
+      console.error('Google login error:', err);
+      showLoginError(err.message || 'Google login failed');
     }
+  
+    resetGoogleButton();
   }
+  
 
   // All Google OAuth logic removed - UI only now
 

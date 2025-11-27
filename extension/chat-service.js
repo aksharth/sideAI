@@ -275,6 +275,59 @@
       }
     },
 
+    async deleteAllConversations() {
+      try {
+        const baseUrl = await getApiBaseUrl();
+        const authToken = await getAuthTokenAsync();
+        
+        if (!authToken) {
+          return {
+            success: false,
+            error: 'No authentication token found. Please login first.'
+          };
+        }
+
+        const api = window.SiderExtensionAPI || {};
+        const url = api.buildUrl ? await api.buildUrl('/api/conversations/all') : `${baseUrl}/api/conversations/all`;
+        const headers = api.getHeaders ? await api.getHeaders() : {
+          'accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        };
+
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: data.detail || data.message || 'Failed to delete all conversations'
+          };
+        }
+
+        if (data.code === 0) {
+          return {
+            success: true,
+            data: data.data || {}
+          };
+        }
+
+        return {
+          success: false,
+          error: 'Invalid response format from server'
+        };
+      } catch (error) {
+        console.error('Delete all conversations error:', error);
+        return {
+          success: false,
+          error: error.message || 'Failed to delete all conversations'
+        };
+      }
+    },
+
     async sendMessage(conversationId, message, model) {
       try {
         const baseUrl = await getApiBaseUrl();

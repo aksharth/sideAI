@@ -4017,6 +4017,16 @@
           }, 300);
         };
       }
+      
+      // Delete All button
+      const deleteAllBtn = document.getElementById('sider-chat-history-delete-all');
+      if (deleteAllBtn && !deleteAllBtn.hasAttribute('data-listener-attached')) {
+        deleteAllBtn.setAttribute('data-listener-attached', 'true');
+        deleteAllBtn.onclick = (e) => {
+          e.stopPropagation();
+          this.deleteAllConversations();
+        };
+      }
     },
     
     // Create history modal if it doesn't exist
@@ -4745,7 +4755,7 @@
     },
     
     // Show delete confirmation modal
-    showDeleteConfirmation: function(conversationId, onConfirm) {
+    showDeleteConfirmation: function(conversationId, onConfirm, isDeleteAll = false) {
       // Try multiple ways to find the modal
       let modal = document.getElementById('sider-delete-confirmation-modal');
       
@@ -4768,7 +4778,7 @@
         this.loadDeleteConfirmationModal().then(() => {
           modal = document.getElementById('sider-delete-confirmation-modal');
           if (modal) {
-            this.showDeleteConfirmationModal(modal, conversationId, onConfirm);
+            this.showDeleteConfirmationModal(modal, conversationId, onConfirm, isDeleteAll);
           } else {
             console.error('Failed to load delete confirmation modal');
           }
@@ -4776,7 +4786,7 @@
         return;
       }
       
-      this.showDeleteConfirmationModal(modal, conversationId, onConfirm);
+      this.showDeleteConfirmationModal(modal, conversationId, onConfirm, isDeleteAll);
     },
     
     // Load delete confirmation modal if not already loaded
@@ -4806,13 +4816,33 @@
     },
     
     // Helper function to show the modal
-    showDeleteConfirmationModal: function(modal, conversationId, onConfirm) {
+    showDeleteConfirmationModal: function(modal, conversationId, onConfirm, isDeleteAll = false) {
       if (!modal) {
         console.error('Modal is null in showDeleteConfirmationModal');
         return;
       }
       
-      console.log('Showing delete confirmation modal for conversation:', conversationId);
+      console.log('Showing delete confirmation modal:', isDeleteAll ? 'for all conversations' : `for conversation: ${conversationId}`);
+      
+      // Update modal message based on delete type
+      const messageElement = modal.querySelector('.sider-delete-confirmation-message');
+      if (messageElement) {
+        if (isDeleteAll) {
+          messageElement.textContent = 'Are you sure you want to delete all conversations? This action cannot be undone.';
+        } else {
+          messageElement.textContent = 'Are you sure you want to delete this conversation?';
+        }
+      }
+      
+      // Update modal title
+      const titleElement = modal.querySelector('.sider-delete-confirmation-title');
+      if (titleElement) {
+        if (isDeleteAll) {
+          titleElement.textContent = 'Delete All Conversations';
+        } else {
+          titleElement.textContent = 'Delete Conversation';
+        }
+      }
       
       // Show modal
       modal.style.display = 'flex';
@@ -5100,6 +5130,65 @@
         console.error('Error exporting conversation:', error);
         this.showNotification(`Error: ${error.message || 'Failed to export conversation'}`, 'error');
       }
+    },
+    
+    // Delete all conversations
+    deleteAllConversations: async function() {
+      // Show confirmation modal
+      this.showDeleteConfirmation(null, async () => {
+        // This callback runs when user confirms deletion
+        try {
+          if (!window.SiderChatService || !window.SiderChatService.deleteAllConversations) {
+            console.error('ChatService not available');
+            this.showNotification('Error: Chat service not available', 'error');
+            return;
+          }
+          
+          const result = await window.SiderChatService.deleteAllConversations();
+          
+          if (result.success) {
+            console.log('✅ All conversations deleted successfully');
+            
+            // Clear current conversation if any
+            this.currentConversationId = null;
+            const messagesContainer = document.getElementById('sider-chat-messages');
+            if (messagesContainer) {
+              messagesContainer.innerHTML = '';
+            }
+            
+            // Show welcome screen
+            const chatContainer = document.getElementById('sider-chat-container');
+            const welcome = document.querySelector('.sider-welcome');
+            if (chatContainer) {
+              chatContainer.style.display = 'none';
+            }
+            if (welcome) {
+              welcome.style.display = 'block';
+            }
+            
+            // Clear cache
+            this.conversationsCache = null;
+            
+            // Refresh conversation list
+            const listContainer = document.getElementById('sider-chat-history-list');
+            const countElement = document.getElementById('sider-chat-history-count');
+            if (listContainer) {
+              listContainer.innerHTML = '<div style="padding: 40px; text-align: center; color: #6b7280;">No conversations</div>';
+            }
+            if (countElement) {
+              countElement.textContent = '(0)';
+            }
+            
+            this.showNotification('All conversations deleted successfully', 'success');
+          } else {
+            console.error('Failed to delete all conversations:', result.error);
+            this.showNotification(`Error: ${result.error || 'Failed to delete all conversations'}`, 'error');
+          }
+        } catch (error) {
+          console.error('Error deleting all conversations:', error);
+          this.showNotification(`Error: ${error.message || 'Failed to delete all conversations'}`, 'error');
+        }
+      }, true); // Pass true to indicate this is delete all
     },
     
     // Delete conversation
