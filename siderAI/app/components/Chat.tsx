@@ -1361,6 +1361,7 @@ export default function Chat() {
   };
 
   const handleChatHistoryItemClick = (chatId: string) => {
+    setViewMode('single');
     fetchConversation(chatId);
   };
 
@@ -1744,15 +1745,8 @@ export default function Chat() {
           });
           
           console.log('Message completed:', { cid, tokens_used });
-          
-          // Call GET APIs after successful chat completion (only if not aborted)
-          if (!abortController.signal.aborted) {
-            const finalCid = cid || currentConversationId;
-            if (finalCid) {
-              // Call GET conversation details
-              await fetchConversation(finalCid);
-            }
-          }
+          setIsGeneratingState(false);
+
         } else {
           throw new Error(responseData.msg || 'Invalid response format');
         }
@@ -1857,15 +1851,8 @@ export default function Chat() {
           });
           
           console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
-          
-          // Call GET APIs after successful chat completion (only if not aborted)
-          if (!abortController.signal.aborted) {
-            const finalCid = cid || currentConversationId;
-            if (finalCid) {
-              // Call GET conversation details
-              await fetchConversation(finalCid);
-            }
-          }
+          setIsGeneratingState(false);
+
         } else {
           throw new Error(responseData.msg || 'Invalid response format');
         }
@@ -2356,7 +2343,7 @@ export default function Chat() {
       // Step 3: Send message using appropriate API
       let response;
       let responseData;
-      
+
       // If images are present, use /api/chat/send with image_url
       if (imageUrls && imageUrls.length > 0) {
         const requestBody = {
@@ -2366,293 +2353,293 @@ export default function Chat() {
           stream: false,
           image_url: imageUrls[0], // Use first image URL
         };
-        
+
         console.log('Sending message with images using send API:', {
           message: messageText,
           model: selectedModel || 'webby fusion',
           conversation_id: currentConversationId,
           image_url: imageUrls[0],
         });
-        
-        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: abortControllerRef.current.signal,
-      });
 
-        // Check if request was aborted
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-          if (response.status === 401 || errorData.detail === 'Authentication required') {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('user');
-            throw new Error('Session expired. Please login again.');
-          }
-          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
-        }
-
-        responseData = await response.json();
-        
-        // Check again if request was aborted after response
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-        
-        // Check one more time before processing response
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-        
-        // Handle send API response: { code: 0, msg: "", data: { text: "...", conversation_id: "...", tokens_used: ... } }
-        if (responseData.code === 0 && responseData.data) {
-          const { text, conversation_id: cid, tokens_used } = responseData.data;
-          
-          // Check again before updating state
-          if (abortControllerRef.current?.signal.aborted) {
-            setIsGenerating(false);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiMessageId
-                  ? { ...msg, isGenerating: false }
-                  : msg
-              )
-            );
-            return;
-          }
-          
-          // Update conversation ID if provided
-          if (cid) {
-            setConversationId(cid);
-          }
-          
-          // Update message with response text
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, content: text || '', isGenerating: false }
-                : msg
-            )
-          );
-          
-          console.log('Message completed:', { cid, tokens_used });
-          
-          // Call GET APIs after successful chat completion (only if not aborted)
-          if (!abortControllerRef.current?.signal.aborted) {
-            const finalCid = cid || currentConversationId;
-            if (finalCid) {
-              // Call GET conversation details
-              await fetchConversation(finalCid);
-            }
-          }
-        } else {
-          throw new Error(responseData.msg || 'Invalid response format');
-        }
-      } else {
-        // No images, use completions API
-        const requestBody: CompletionRequestBody = {
-          cid: currentConversationId,
-          model: selectedModel || 'webby fusion',
-          multi_content: [
-            {
-              type: 'text',
-              text: messageText
-            }
-          ],
-          ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
-        };
-        
-        console.log('Sending message without images using completions API:', {
-          message: messageText,
-          model: selectedModel || 'webby fusion',
-          conversation_id: currentConversationId,
-          file_ids: fileIds && fileIds.length > 0 ? fileIds : 'none',
-          file_count: fileIds ? fileIds.length : 0
-        });
-        
-        response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(requestBody),
-          signal: abortControllerRef.current.signal,
-        });
-
-        // Check if request was aborted
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
-          if (response.status === 401 || errorData.detail === 'Authentication required') {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('user');
-            throw new Error('Session expired. Please login again.');
-          }
-          throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
-        }
-
-        responseData = await response.json();
-        
-        // Check again if request was aborted after response
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-        
-        // Check one more time before processing response
-        if (abortControllerRef.current?.signal.aborted) {
-          setIsGenerating(false);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, isGenerating: false }
-                : msg
-            )
-          );
-          return;
-        }
-        
-        // Handle completions API response: { code: 0, msg: "", data: { id, text, cid, tokens_used, model, parent_message_id } }
-        if (responseData.code === 0 && responseData.data) {
-          const { text, cid, id, tokens_used, model: responseModel, parent_message_id } = responseData.data;
-          
-          // Check again before updating state
-          if (abortControllerRef.current?.signal.aborted) {
-            setIsGenerating(false);
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === aiMessageId
-                  ? { ...msg, isGenerating: false }
-                  : msg
-              )
-            );
-            return;
-          }
-          
-          // Update conversation ID if provided
-          if (cid) {
-            setConversationId(cid);
-          }
-          
-          // Update message with response text
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? { ...msg, content: text || '', isGenerating: false }
-                : msg
-            )
-          );
-          
-          console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
-          
-          // Call GET APIs after successful chat completion (only if not aborted)
-          if (!abortControllerRef.current?.signal.aborted) {
-            const finalCid = cid || currentConversationId;
-            if (finalCid) {
-              // Call GET conversation details
-              await fetchConversation(finalCid);
-            }
-          }
-        } else {
-          throw new Error(responseData.msg || 'Invalid response format');
-        }
-      }
-      
-      // Revoke object URLs after message is sent (with delay to ensure message is rendered)
-      if (objectUrlsToCleanup.length > 0) {
-        setTimeout(() => {
-          objectUrlsToCleanup.forEach((url) => {
-            URL.revokeObjectURL(url);
+          response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.SEND), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: abortControllerRef.current.signal,
           });
-        }, 1000);
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        // Request was aborted - ensure state is cleaned up
+
+          // Check if request was aborted
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+            if (response.status === 401 || errorData.detail === 'Authentication required') {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('user');
+              throw new Error('Session expired. Please login again.');
+            }
+            throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+          }
+
+          responseData = await response.json();
+
+          // Check again if request was aborted after response
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          // Check one more time before processing response
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          // Handle send API response: { code: 0, msg: "", data: { text: "...", conversation_id: "...", tokens_used: ... } }
+          if (responseData.code === 0 && responseData.data) {
+            const { text, conversation_id: cid, tokens_used } = responseData.data;
+
+            // Check again before updating state
+            if (abortControllerRef.current?.signal.aborted) {
+              setIsGenerating(false);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMessageId
+                    ? { ...msg, isGenerating: false }
+                    : msg
+                )
+              );
+              return;
+            }
+
+            // Update conversation ID if provided
+            if (cid) {
+              setConversationId(cid);
+            }
+
+            // Update message with response text
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, content: text || '', isGenerating: false }
+                  : msg
+              )
+            );
+
+            console.log('Message completed:', { cid, tokens_used });
+
+            // Call GET APIs after successful chat completion (only if not aborted)
+            if (!abortControllerRef.current?.signal.aborted) {
+              const finalCid = cid || currentConversationId;
+              if (finalCid) {
+                // Call GET conversation details
+                await fetchConversation(finalCid);
+              }
+            }
+          } else {
+            throw new Error(responseData.msg || 'Invalid response format');
+          }
+        } else {
+          // No images, use completions API
+          const requestBody: CompletionRequestBody = {
+            cid: currentConversationId,
+            model: selectedModel || 'webby fusion',
+            multi_content: [
+              {
+                type: 'text',
+                text: messageText
+              }
+            ],
+            ...(fileIds && fileIds.length > 0 ? { file_ids: fileIds } : {}),
+          };
+
+          console.log('Sending message without images using completions API:', {
+            message: messageText,
+            model: selectedModel || 'webby fusion',
+            conversation_id: currentConversationId,
+            file_ids: fileIds && fileIds.length > 0 ? fileIds : 'none',
+            file_count: fileIds ? fileIds.length : 0
+          });
+
+          response = await fetch(getApiUrl(API_ENDPOINTS.CHAT.COMPLETIONS), {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: abortControllerRef.current.signal,
+          });
+
+          // Check if request was aborted
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to send message' }));
+            if (response.status === 401 || errorData.detail === 'Authentication required') {
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('user');
+              throw new Error('Session expired. Please login again.');
+            }
+            throw new Error(errorData.detail || errorData.msg || 'Failed to send message');
+          }
+
+          responseData = await response.json();
+
+          // Check again if request was aborted after response
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          // Check one more time before processing response
+          if (abortControllerRef.current?.signal.aborted) {
+            setIsGenerating(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, isGenerating: false }
+                  : msg
+              )
+            );
+            return;
+          }
+
+          // Handle completions API response: { code: 0, msg: "", data: { id, text, cid, tokens_used, model, parent_message_id } }
+          if (responseData.code === 0 && responseData.data) {
+            const { text, cid, id, tokens_used, model: responseModel, parent_message_id } = responseData.data;
+
+            // Check again before updating state
+            if (abortControllerRef.current?.signal.aborted) {
+              setIsGenerating(false);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === aiMessageId
+                    ? { ...msg, isGenerating: false }
+                    : msg
+                )
+              );
+              return;
+            }
+
+            // Update conversation ID if provided
+            if (cid) {
+              setConversationId(cid);
+            }
+
+            // Update message with response text
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === aiMessageId
+                  ? { ...msg, content: text || '', isGenerating: false }
+                  : msg
+              )
+            );
+
+            console.log('Message completed:', { id, cid, tokens_used, model: responseModel, parent_message_id });
+
+            // Call GET APIs after successful chat completion (only if not aborted)
+            if (!abortControllerRef.current?.signal.aborted) {
+              const finalCid = cid || currentConversationId;
+              if (finalCid) {
+                // Call GET conversation details
+                await fetchConversation(finalCid);
+              }
+            }
+          } else {
+            throw new Error(responseData.msg || 'Invalid response format');
+          }
+        }
+
+        // Revoke object URLs after message is sent (with delay to ensure message is rendered)
+        if (objectUrlsToCleanup.length > 0) {
+          setTimeout(() => {
+            objectUrlsToCleanup.forEach((url) => {
+              URL.revokeObjectURL(url);
+            });
+          }, 1000);
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          // Request was aborted - ensure state is cleaned up
+          setIsGenerating(false);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, isGenerating: false }
+                : msg
+            )
+          );
+          abortControllerRef.current = null;
+          return;
+        }
+        console.error('Error sending message:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Sorry, an error occurred. Please try again.';
+
+        // If authentication error, show specific message
+        if (errorMessage.includes('Authentication') || errorMessage.includes('Session expired')) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: errorMessage, isGenerating: false }
+                : msg
+            )
+          );
+          // Optionally redirect to login after a delay
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 2000);
+        } else {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? { ...msg, content: errorMessage, isGenerating: false }
+                : msg
+            )
+          );
+        }
+      } finally {
         setIsGenerating(false);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMessageId
-              ? { ...msg, isGenerating: false }
-              : msg
-          )
-        );
         abortControllerRef.current = null;
-        return;
       }
-      console.error('Error sending message:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Sorry, an error occurred. Please try again.';
-      
-      // If authentication error, show specific message
-      if (errorMessage.includes('Authentication') || errorMessage.includes('Session expired')) {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-              ? { ...msg, content: errorMessage, isGenerating: false }
-            : msg
-        )
-      );
-        // Optionally redirect to login after a delay
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
-      } else {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMessageId
-              ? { ...msg, content: errorMessage, isGenerating: false }
-              : msg
-          )
-        );
-      }
-    } finally {
-      setIsGenerating(false);
-      abortControllerRef.current = null;
-    }
     }
   };
 
@@ -2666,7 +2653,7 @@ export default function Chat() {
     setMessages2((prev) =>
       prev.filter((msg) => !msg.isGenerating)
     );
-    
+
     // Then abort controllers
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -2713,8 +2700,8 @@ export default function Chat() {
       const url = `/translator/${translatorSlug}`;
       window.open(url, '_blank');
     } else {
-    const url = `/create/image/${slug}`;
-    window.open(url, '_blank');
+      const url = `/create/image/${slug}`;
+      window.open(url, '_blank');
     }
   };
 
@@ -2762,11 +2749,11 @@ export default function Chat() {
         <div className={`${isSidebarCollapsed ? 'p-2' : 'p-4'} border-b border-gray-200 dark:border-gray-700`}>
           <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!isSidebarCollapsed && (
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+                <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
                   Webby Sider
-            </span>
+                </span>
               </div>
             )}
             <motion.button
@@ -2804,11 +2791,10 @@ export default function Chat() {
                   return rest;
                 });
               }}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2'} rounded-lg ${isSidebarCollapsed ? 'mb-1' : 'mb-2'} transition-colors ${
-                activeView === 'chat'
-                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-              }`}
+              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-2 px-3 py-2'} rounded-lg ${isSidebarCollapsed ? 'mb-1' : 'mb-2'} transition-colors ${activeView === 'chat'
+                ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
             >
               <MessageCircle className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-5 h-5'}`} />
               {!isSidebarCollapsed && <span className="font-semibold">Chat</span>}
@@ -2826,16 +2812,16 @@ export default function Chat() {
           {/* Agents */}
           <div className={isSidebarCollapsed ? 'mt-2' : ''}>
             {!isSidebarCollapsed && (
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
-              Agents
-            </h3>
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
+                Agents
+              </h3>
             )}
             <div className="space-y-1">
               {agents.map((agent, index) => {
                 const Icon = agent.icon;
                 const agentSlug = agent.name.toLowerCase().replace(/\s+/g, '-') as 'deep-research' | 'web-creator' | 'ai-writer' | 'ai-slides';
                 // Deep Research should be active for both deep-research and scholar-research
-                const isActive = agentSlug === 'deep-research' 
+                const isActive = agentSlug === 'deep-research'
                   ? (activeView === 'deep-research' || activeView === 'scholar-research')
                   : activeView === agentSlug;
                 const handleAgentClick = () => {
@@ -2871,11 +2857,10 @@ export default function Chat() {
                           return rest;
                         });
                       }}
-                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-3'} py-2 rounded-lg transition-colors ${
-                        isActive
-                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
+                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-3 px-3'} py-2 rounded-lg transition-colors ${isActive
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
                     >
                       <Icon className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
                       {!isSidebarCollapsed && <span className="text-sm">{agent.name}</span>}
@@ -2922,8 +2907,8 @@ export default function Chat() {
                   <Grid3x3 className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
                   {!isSidebarCollapsed && (
                     <>
-                  <span className="text-sm">More</span>
-                  <ChevronRight className="w-4 h-4 ml-auto" />
+                      <span className="text-sm">More</span>
+                      <ChevronRight className="w-4 h-4 ml-auto" />
                     </>
                   )}
                 </motion.button>
@@ -2962,92 +2947,92 @@ export default function Chat() {
                       onMouseEnter={() => setIsMoreHovered(true)}
                       onMouseLeave={() => setIsMoreHovered(false)}
                     >
-                    {/* IMAGE SECTION */}
-                    <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-                        Image
-                      </h4>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                        {[
-                          { name: 'AI Image Generator', icon: Palette },
-                          { name: 'Background Remover', icon: Square },
-                          { name: 'Text Remover', icon: Type },
-                          { name: 'Photo Eraser', icon: Eraser },
-                          { name: 'Inpaint', icon: ScanSearch },
-                          { name: 'Image Upscaler', icon: Maximize2 },
-                          { name: 'Background Changer', icon: Layers },
-                        ].map((item, i) => {
-                          const Icon = item.icon;
-                          return (
-                            <motion.button
-                              key={item.name}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: i * 0.03 }}
-                              onClick={() => handleToolClick(item.name)}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                            >
-                              <Icon className="w-4 h-4 text-blue-500" />
-                              <span className="text-sm text-gray-700 dark:text-gray-200">
-                                {item.name}
-                              </span>
-                            </motion.button>
-                          );
-                        })}
+                      {/* IMAGE SECTION */}
+                      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+                          Image
+                        </h4>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                          {[
+                            { name: 'AI Image Generator', icon: Palette },
+                            { name: 'Background Remover', icon: Square },
+                            { name: 'Text Remover', icon: Type },
+                            { name: 'Photo Eraser', icon: Eraser },
+                            { name: 'Inpaint', icon: ScanSearch },
+                            { name: 'Image Upscaler', icon: Maximize2 },
+                            { name: 'Background Changer', icon: Layers },
+                          ].map((item, i) => {
+                            const Icon = item.icon;
+                            return (
+                              <motion.button
+                                key={item.name}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: i * 0.03 }}
+                                onClick={() => handleToolClick(item.name)}
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                              >
+                                <Icon className="w-4 h-4 text-blue-500" />
+                                <span className="text-sm text-gray-700 dark:text-gray-200">
+                                  {item.name}
+                                </span>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* TRANSLATOR SECTION */}
-                    <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-                        Translator
-                      </h4>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                        {[
-                          { name: 'AI Translator', icon: Languages },
-                          { name: 'Image Translator', icon: ImageIcon },
-                        ].map((item, i) => {
-                          const Icon = item.icon;
-                          return (
-                            <motion.button
-                              key={item.name}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.25 + i * 0.05 }}
-                              onClick={() => handleToolClick(item.name)}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                            >
-                              <Icon className="w-4 h-4 text-orange-500" />
-                              <span className="text-sm text-gray-700 dark:text-gray-200">
-                                {item.name}
-                              </span>
-                            </motion.button>
-                          );
-                        })}
+                      {/* TRANSLATOR SECTION */}
+                      <div className="p-4 border-b border-gray-100 dark:border-gray-700">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+                          Translator
+                        </h4>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                          {[
+                            { name: 'AI Translator', icon: Languages },
+                            { name: 'Image Translator', icon: ImageIcon },
+                          ].map((item, i) => {
+                            const Icon = item.icon;
+                            return (
+                              <motion.button
+                                key={item.name}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.25 + i * 0.05 }}
+                                onClick={() => handleToolClick(item.name)}
+                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                              >
+                                <Icon className="w-4 h-4 text-orange-500" />
+                                <span className="text-sm text-gray-700 dark:text-gray-200">
+                                  {item.name}
+                                </span>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* VIDEO SECTION */}
-                    <div className="p-4">
-                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
-                        Video
-                      </h4>
-                      <div className="flex flex-col gap-2">
-                        <motion.button
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.4 }}
-                          onClick={() => handleToolClick('AI Video Shortener')}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        >
-                          <Video className="w-4 h-4 text-purple-500" />
-                          <span className="text-sm text-gray-700 dark:text-gray-200">
-                            AI Video Shortener
-                          </span>
-                        </motion.button>
+                      {/* VIDEO SECTION */}
+                      <div className="p-4">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide">
+                          Video
+                        </h4>
+                        <div className="flex flex-col gap-2">
+                          <motion.button
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.4 }}
+                            onClick={() => handleToolClick('AI Video Shortener')}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            <Video className="w-4 h-4 text-purple-500" />
+                            <span className="text-sm text-gray-700 dark:text-gray-200">
+                              AI Video Shortener
+                            </span>
+                          </motion.button>
+                        </div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
                   </>
                 )}
               </div>
@@ -3057,9 +3042,9 @@ export default function Chat() {
           {/* Wisebase */}
           <div className={isSidebarCollapsed ? 'mt-2' : ''}>
             {!isSidebarCollapsed && (
-            <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
-              Wisebase
-            </h3>
+              <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-3 mb-2">
+                Wisebase
+              </h3>
             )}
             <div className="space-y-1">
               {wisebaseItems.map((item, index) => {
@@ -3085,11 +3070,10 @@ export default function Chat() {
                           return rest;
                         });
                       }}
-                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-2 px-3'} py-2 rounded-lg transition-colors ${
-                        isSidebarCollapsed 
-                          ? `${item.color} ${item.isActive ? 'shadow-sm' : ''} text-gray-700 dark:text-gray-300` 
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
+                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center p-2' : 'gap-2 px-3'} py-2 rounded-lg transition-colors ${isSidebarCollapsed
+                        ? `${item.color} ${item.isActive ? 'shadow-sm' : ''} text-gray-700 dark:text-gray-300`
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
                     >
                       <Icon className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'}`} />
                       {!isSidebarCollapsed && <span className="text-sm">{item.name}</span>}
@@ -3189,7 +3173,7 @@ export default function Chat() {
 
       {/* Main */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-0">
-      
+
         <header className="h-16 dark:bg-gray-800 border-gray-200 dark:border-gray-700 flex items-center justify-end px-6">
           <motion.button
             whileHover={{ scale: 1.1 }}
@@ -3257,337 +3241,934 @@ export default function Chat() {
         ) : (
           /* Chat */
           <>
-          {viewMode === 'double' ? (
-          <div className="flex-1 flex overflow-hidden">
-            {/* Panel 1 */}
-            <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700 relative">
-              {/* Panel Header */}
-              <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {getSelectedModelImagePath(selectedModel) ? (
-                      <img
-                        src={getSelectedModelImagePath(selectedModel)!}
-                        alt={selectedModel}
-                        className="w-full h-full object-contain rounded-full"
-                        width={20}
-                        height={20}
-                      />
-                    ) : (
-                      <Zap className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                  <div ref={modelDropdownRef1} className="relative">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setIsModelDropdownOpen1(!isModelDropdownOpen1)}
-                      className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
-                    >
-                      {availableModels.find((m) => m.name === selectedModel)?.displayName || 
-                       OTHER_MODELS.find((m) => m.name === selectedModel)?.displayName || 
-                       selectedModel}
-                      {isModelDropdownOpen1 ? (
-                        <ChevronUp className="w-3 h-3" />
-                      ) : (
-                        <ChevronDown className="w-3 h-3" />
-                      )}
-                    </motion.button>
-                    {/* Model Dropdown for Panel 1 */}
-                    {isModelDropdownOpen1 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 10 }}
-                        className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
-                      >
-                        <div className="p-2">
-                          <div className="mb-4">
-                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Basic
-                            </div>
-                            {availableModels
-                              .filter((model) => model.category === 'basic')
-                              .map((model) => {
-                                const isSelected = selectedModel === model.name;
-                                const isDisabled = selectedModel2 === model.name;
-                                return (
-                                  <motion.button
-                                    key={model.id}
-                                    onClick={() => {
-                                      if (!isDisabled) {
-                                        setSelectedModel(model.name);
-                                        setIsModelDropdownOpen1(false);
-                                      }
-                                    }}
-                                    disabled={isDisabled}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                      isSelected
-                                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                        : isDisabled
-                                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                    }`}
-                                  >
-                                    <div className="flex-shrink-0">
-                                      {getModelImagePath(model.id) ? (
-                                        <img
-                                          src={getModelImagePath(model.id)!}
-                                          alt={model.displayName || model.name}
-                                          className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                          width={16}
-                                          height={16}
-                                        />
-                                      ) : (
-                                        <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                          {getModelIcon(model.id)}
+            {viewMode === 'double' ? (
+              <div className="flex-1 flex overflow-hidden">
+                {/* Panel 1 */}
+                <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-700 relative">
+                  {/* Panel Header */}
+                  <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {getSelectedModelImagePath(selectedModel) ? (
+                          <img
+                            src={getSelectedModelImagePath(selectedModel)!}
+                            alt={selectedModel}
+                            className="w-full h-full object-contain rounded-full"
+                            width={20}
+                            height={20}
+                          />
+                        ) : (
+                          <Zap className="w-3 h-3 text-white" />
+                        )}
+                      </div>
+                      <div ref={modelDropdownRef1} className="relative">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setIsModelDropdownOpen1(!isModelDropdownOpen1)}
+                          className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
+                        >
+                          {availableModels.find((m) => m.name === selectedModel)?.displayName ||
+                            OTHER_MODELS.find((m) => m.name === selectedModel)?.displayName ||
+                            selectedModel}
+                          {isModelDropdownOpen1 ? (
+                            <ChevronUp className="w-3 h-3" />
+                          ) : (
+                            <ChevronDown className="w-3 h-3" />
+                          )}
+                        </motion.button>
+                        {/* Model Dropdown for Panel 1 */}
+                        {isModelDropdownOpen1 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
+                          >
+                            <div className="p-2">
+                              <div className="mb-4">
+                                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                  Basic
+                                </div>
+                                {availableModels
+                                  .filter((model) => model.category === 'basic')
+                                  .map((model) => {
+                                    const isSelected = selectedModel === model.name;
+                                    const isDisabled = selectedModel2 === model.name;
+                                    return (
+                                      <motion.button
+                                        key={model.id}
+                                        onClick={() => {
+                                          if (!isDisabled) {
+                                            setSelectedModel(model.name);
+                                            setIsModelDropdownOpen1(false);
+                                          }
+                                        }}
+                                        disabled={isDisabled}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : isDisabled
+                                            ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                          }`}
+                                      >
+                                        <div className="flex-shrink-0">
+                                          {getModelImagePath(model.id) ? (
+                                            <img
+                                              src={getModelImagePath(model.id)!}
+                                              alt={model.displayName || model.name}
+                                              className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                              width={16}
+                                              height={16}
+                                            />
+                                          ) : (
+                                            <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                              {getModelIcon(model.id)}
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                    <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
-                                    {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-                                  </motion.button>
-                                );
-                              })}
-                          </div>
-                          <div className="mb-4">
-                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                              Advanced
-                            </div>
-                            {availableModels
-                              .filter((model) => model.category === 'advanced')
-                              .map((model) => {
-                                const isSelected = selectedModel === model.name;
-                                const isDisabled = selectedModel2 === model.name;
-                                return (
-                                  <motion.button
-                                    key={model.id}
-                                    onClick={() => {
-                                      if (!isDisabled) {
-                                        setSelectedModel(model.name);
-                                        setIsModelDropdownOpen1(false);
-                                      }
-                                    }}
-                                    disabled={isDisabled}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                      isSelected
-                                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                        : isDisabled
-                                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                    }`}
-                                  >
-                                    <div className="flex-shrink-0">
-                                      {getModelImagePath(model.id) ? (
-                                        <img
-                                          src={getModelImagePath(model.id)!}
-                                          alt={model.displayName || model.name}
-                                          className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                          width={16}
-                                          height={16}
-                                        />
-                                      ) : (
-                                        <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                          {getModelIcon(model.id)}
+                                        <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
+                                        {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                      </motion.button>
+                                    );
+                                  })}
+                              </div>
+                              <div className="mb-4">
+                                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                  Advanced
+                                </div>
+                                {availableModels
+                                  .filter((model) => model.category === 'advanced')
+                                  .map((model) => {
+                                    const isSelected = selectedModel === model.name;
+                                    const isDisabled = selectedModel2 === model.name;
+                                    return (
+                                      <motion.button
+                                        key={model.id}
+                                        onClick={() => {
+                                          if (!isDisabled) {
+                                            setSelectedModel(model.name);
+                                            setIsModelDropdownOpen1(false);
+                                          }
+                                        }}
+                                        disabled={isDisabled}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                          : isDisabled
+                                            ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                          }`}
+                                      >
+                                        <div className="flex-shrink-0">
+                                          {getModelImagePath(model.id) ? (
+                                            <img
+                                              src={getModelImagePath(model.id)!}
+                                              alt={model.displayName || model.name}
+                                              className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                              width={16}
+                                              height={16}
+                                            />
+                                          ) : (
+                                            <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                              {getModelIcon(model.id)}
+                                            </div>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                    <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
-                                    {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-                                  </motion.button>
-                                );
-                              })}
-                          </div>
+                                        <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
+                                        {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                      </motion.button>
+                                    );
+                                  })}
+                              </div>
 
-                          {/* Other Models Option */}
-                          <div className="relative">
-                            <motion.button
-                              ref={otherModelsRef1}
-                              onMouseEnter={() => {
-                                if (otherModelsRef1.current && modelDropdownRef1.current) {
-                                  const buttonRect = otherModelsRef1.current.getBoundingClientRect();
-                                  const mainDropdownRect = modelDropdownRef1.current.getBoundingClientRect();
-                                  const viewportHeight = window.innerHeight;
-                                  const dropdownHeight = 256;
-                                  let top = buttonRect.top;
-                                  if (buttonRect.top + dropdownHeight > viewportHeight) {
-                                    top = viewportHeight - dropdownHeight - 8;
-                                    if (top < 8) {
-                                      top = 8;
+                              {/* Other Models Option */}
+                              <div className="relative">
+                                <motion.button
+                                  ref={otherModelsRef1}
+                                  onMouseEnter={() => {
+                                    if (otherModelsRef1.current && modelDropdownRef1.current) {
+                                      const buttonRect = otherModelsRef1.current.getBoundingClientRect();
+                                      const mainDropdownRect = modelDropdownRef1.current.getBoundingClientRect();
+                                      const viewportHeight = window.innerHeight;
+                                      const dropdownHeight = 256;
+                                      let top = buttonRect.top;
+                                      if (buttonRect.top + dropdownHeight > viewportHeight) {
+                                        top = viewportHeight - dropdownHeight - 8;
+                                        if (top < 8) {
+                                          top = 8;
+                                        }
+                                      }
+                                      const left = mainDropdownRect.right + 8;
+                                      setOtherModelsDropdownPosition1({ top, left });
                                     }
-                                  }
-                                  const left = mainDropdownRect.right + 8;
-                                  setOtherModelsDropdownPosition1({ top, left });
-                                }
-                                setIsOtherModelsHovered1(true);
-                              }}
-                              onMouseLeave={() => setIsOtherModelsHovered1(false)}
-                              onClick={() => {
-                                setIsModelDropdownOpen(false);
-                              }}
-                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                            >
-                              <span className="text-sm font-medium">... Other Models</span>
-                              <ChevronRight className="w-4 h-4" />
-                            </motion.button>
-
-                            {/* Other Models Hover Dropdown */}
-                            {isOtherModelsHovered1 && otherModelsRef1.current && otherModelsDropdownPosition1.top > 0 && (
-                              <>
-                                {/* Invisible bridge to prevent hover loss */}
-                                {modelDropdownRef.current && (
-                                  <div
-                                    className="fixed z-[59] pointer-events-auto"
-                                    style={{
-                                      top: `${otherModelsDropdownPosition1.top}px`,
-                                      left: `${otherModelsDropdownPosition1.left}px`,
-                                      width: `${Math.max(8, otherModelsRef1.current.getBoundingClientRect().right - otherModelsDropdownPosition1.left + 8)}px`,
-                                      height: `${otherModelsRef1.current.getBoundingClientRect().height}px`,
-                                    }}
-                                    onMouseEnter={() => setIsOtherModelsHovered1(true)}
-                                  />
-                                )}
-                                <motion.div
-                                  ref={otherModelsDropdownRef1}
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  exit={{ opacity: 0, x: -10 }}
-                                  onMouseEnter={() => setIsOtherModelsHovered1(true)}
-                                  onMouseLeave={() => setIsOtherModelsHovered1(false)}
-                                  className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-64 overflow-y-auto"
-                                  style={{
-                                    top: `${otherModelsDropdownPosition1.top}px`,
-                                    left: `${otherModelsDropdownPosition1.left}px`,
+                                    setIsOtherModelsHovered1(true);
                                   }}
+                                  onMouseLeave={() => setIsOtherModelsHovered1(false)}
+                                  onClick={() => {
+                                    setIsModelDropdownOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 >
-                                  <div className="p-2">
-                                    {/* Additional Other Models */}
-                                    {filteredOtherModels.length > 0 && (
-                                      <div>
-                                        {filteredOtherModels.map((model) => {
-                                          const isSelected = selectedModel === model.name;
-                                          const isDisabled = selectedModel2 === model.name;
-                                          return (
-                                            <motion.button
-                                              key={model.id}
-                                              onClick={() => {
-                                                if (!isDisabled) {
-                                                  setSelectedModel(model.name);
-                                                  setIsModelDropdownOpen1(false);
-                                                  setIsOtherModelsHovered1(false);
-                                                }
-                                              }}
-                                              disabled={isDisabled}
-                                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                                isSelected
-                                                  ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                                  : isDisabled
-                                                  ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                                  : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                              }`}
-                                            >
-                                              <div className="flex-shrink-0">
-                                                {getModelImagePath(model.id) ? (
-                                                  <img
-                                                    src={getModelImagePath(model.id)!}
-                                                    alt={model.displayName || model.name}
-                                                    className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                                    width={16}
-                                                    height={16}
-                                                  />
-                                                ) : (
-                                                  <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                    {getModelIcon(model.id)}
+                                  <span className="text-sm font-medium">... Other Models</span>
+                                  <ChevronRight className="w-4 h-4" />
+                                </motion.button>
+
+                                {/* Other Models Hover Dropdown */}
+                                {isOtherModelsHovered1 && otherModelsRef1.current && otherModelsDropdownPosition1.top > 0 && (
+                                  <>
+                                    {/* Invisible bridge to prevent hover loss */}
+                                    {modelDropdownRef.current && (
+                                      <div
+                                        className="fixed z-[59] pointer-events-auto"
+                                        style={{
+                                          top: `${otherModelsDropdownPosition1.top}px`,
+                                          left: `${otherModelsDropdownPosition1.left}px`,
+                                          width: `${Math.max(8, otherModelsRef1.current.getBoundingClientRect().right - otherModelsDropdownPosition1.left + 8)}px`,
+                                          height: `${otherModelsRef1.current.getBoundingClientRect().height}px`,
+                                        }}
+                                        onMouseEnter={() => setIsOtherModelsHovered1(true)}
+                                      />
+                                    )}
+                                    <motion.div
+                                      ref={otherModelsDropdownRef1}
+                                      initial={{ opacity: 0, x: -10 }}
+                                      animate={{ opacity: 1, x: 0 }}
+                                      exit={{ opacity: 0, x: -10 }}
+                                      onMouseEnter={() => setIsOtherModelsHovered1(true)}
+                                      onMouseLeave={() => setIsOtherModelsHovered1(false)}
+                                      className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-64 overflow-y-auto"
+                                      style={{
+                                        top: `${otherModelsDropdownPosition1.top}px`,
+                                        left: `${otherModelsDropdownPosition1.left}px`,
+                                      }}
+                                    >
+                                      <div className="p-2">
+                                        {/* Additional Other Models */}
+                                        {filteredOtherModels.length > 0 && (
+                                          <div>
+                                            {filteredOtherModels.map((model) => {
+                                              const isSelected = selectedModel === model.name;
+                                              const isDisabled = selectedModel2 === model.name;
+                                              return (
+                                                <motion.button
+                                                  key={model.id}
+                                                  onClick={() => {
+                                                    if (!isDisabled) {
+                                                      setSelectedModel(model.name);
+                                                      setIsModelDropdownOpen1(false);
+                                                      setIsOtherModelsHovered1(false);
+                                                    }
+                                                  }}
+                                                  disabled={isDisabled}
+                                                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                                    : isDisabled
+                                                      ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                    }`}
+                                                >
+                                                  <div className="flex-shrink-0">
+                                                    {getModelImagePath(model.id) ? (
+                                                      <img
+                                                        src={getModelImagePath(model.id)!}
+                                                        alt={model.displayName || model.name}
+                                                        className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                                        width={16}
+                                                        height={16}
+                                                      />
+                                                    ) : (
+                                                      <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                        {getModelIcon(model.id)}
+                                                      </div>
+                                                    )}
                                                   </div>
-                                                )}
-                                              </div>
-                                              <span className="text-sm font-medium flex-1">
-                                                {model.displayName || model.name}
-                                              </span>
-                                              {model.id === 'claude-opus-4.1' && (
-                                                <div className="flex items-center gap-1">
-                                                  <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
-                                                  <Star className="w-3 h-3 text-purple-500" />
-                                                </div>
-                                              )}
-                                            </motion.button>
-                                          );
-                                        })}
+                                                  <span className="text-sm font-medium flex-1">
+                                                    {model.displayName || model.name}
+                                                  </span>
+                                                  {model.id === 'claude-opus-4.1' && (
+                                                    <div className="flex items-center gap-1">
+                                                      <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
+                                                      <Star className="w-3 h-3 text-purple-500" />
+                                                    </div>
+                                                  )}
+                                                </motion.button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
                                       </div>
+                                    </motion.div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setViewMode('single')}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                  {/* Panel 1 Messages */}
+                  <div className="flex-1 overflow-y-auto p-4">
+                    {messages.length === 0 ? (
+                      <div className="text-center pt-12">
+                        <motion.h2
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                        >
+                          Hi,
+                        </motion.h2>
+                        <p className="text-lg text-gray-600 dark:text-gray-400">
+                          How can I assist you today?
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {messages.map((message) => (
+                          <motion.div
+                            key={message.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            {message.role === 'assistant' ? (
+                              <div className="flex items-start gap-2 max-w-[85%]">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                  {getSelectedModelImagePath(message.model || selectedModel) ? (
+                                    <img
+                                      src={getSelectedModelImagePath(message.model || selectedModel)!}
+                                      alt={message.model || selectedModel}
+                                      className="w-full h-full object-contain rounded-full"
+                                      width={24}
+                                      height={24}
+                                    />
+                                  ) : (
+                                    <Sparkles className="w-3 h-3 text-white" />
+                                  )}
+                                </div>
+                                <div className="flex-1 group">
+                                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                    {availableModels.find((m) => m.name === (message.model || selectedModel))?.displayName ||
+                                      OTHER_MODELS.find((m) => m.name === (message.model || selectedModel))?.displayName ||
+                                      message.model || selectedModel}
+                                  </div>
+                                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm relative">
+                                    {message.content}
+                                    {message.isGenerating && (
+                                      <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full ml-1 animate-pulse" />
                                     )}
                                   </div>
-                                </motion.div>
-                              </>
+                                  {/* Action Buttons */}
+                                  {!message.isGenerating && (
+                                    <div className="flex justify-end items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <button
+                                        onClick={() => handleCopyMessage(message.content)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Copy"
+                                      >
+                                        <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleAddToList(message.id)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Add to list"
+                                      >
+                                        <SquarePlus className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleRegenerate(message.id)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Regenerate"
+                                      >
+                                        <RotateCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleQuote(message.content)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Quote"
+                                      >
+                                        <Quote className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleShare(message.id)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Share"
+                                      >
+                                        <Share2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+
+                                      <button
+                                        onClick={() => handleReadAloud(message.content)}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                        title="Read aloud"
+                                      >
+                                        <Volume2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                      </button>
+                                    </div>
+                                  )}
+
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
+                                {message.images && message.images.length > 0 && (
+                                  <div className="mb-2 flex flex-wrap gap-2">
+                                    {message.images.map((imageUrl, idx) => (
+                                      <img
+                                        key={idx}
+                                        src={imageUrl}
+                                        alt={`Uploaded image ${idx + 1}`}
+                                        className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
+                                        onClick={() => handleImageClick(idx)}
+                                        onError={(e) => {
+                                          console.error('Failed to load image:', imageUrl);
+                                          (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                        loading="lazy"
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                                {message.files && message.files.length > 0 && (
+                                  <div className="mb-2 flex flex-wrap gap-2">
+                                    {message.files.map((file, idx) => (
+                                      <div
+                                        key={idx}
+                                        className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
+                                      >
+                                        <FileText className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                                        <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[150px]">
+                                          {file.name}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {message.content && (
+                                  <p className="text-gray-900 dark:text-white">{message.content}</p>
+                                )}
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      </motion.div>
+                          </motion.div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => setViewMode('single')}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </motion.button>
-              </div>
-              {/* Panel 1 Messages */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {messages.length === 0 ? (
-                  <div className="text-center pt-12">
-                    <motion.h2
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
-                    >
-                      Hi,
-                    </motion.h2>
-                    <p className="text-lg text-gray-600 dark:text-gray-400">
-                      How can I assist you today?
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => (
-                      <motion.div
-                        key={message.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        {message.role === 'assistant' ? (
-                          <div className="flex items-start gap-2 max-w-[85%]">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              {getSelectedModelImagePath(message.model || selectedModel) ? (
-                                <img
-                                  src={getSelectedModelImagePath(message.model || selectedModel)!}
-                                  alt={message.model || selectedModel}
-                                  className="w-full h-full object-contain rounded-full"
-                                  width={24}
-                                  height={24}
-                                />
-                              ) : (
-                                <Sparkles className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                            <div className="flex-1 group">
-                              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                {availableModels.find((m) => m.name === (message.model || selectedModel))?.displayName || 
-                                 OTHER_MODELS.find((m) => m.name === (message.model || selectedModel))?.displayName || 
-                                 message.model || selectedModel}
+
+                {/* Panel 2 - GPT-5 mini */}
+                {isPanel2Open && (
+                  <div className="flex-1 flex flex-col relative">
+                    {/* Panel Header */}
+                    <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {getSelectedModelImagePath(selectedModel2) ? (
+                            <img
+                              src={getSelectedModelImagePath(selectedModel2)!}
+                              alt={selectedModel2}
+                              className="w-full h-full object-contain rounded-full"
+                              width={20}
+                              height={20}
+                            />
+                          ) : (
+                            <Sparkles className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <div ref={modelDropdownRef2} className="relative">
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setIsModelDropdownOpen2(!isModelDropdownOpen2)}
+                            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
+                          >
+                            {availableModels.find((m) => m.name === selectedModel2)?.displayName ||
+                              OTHER_MODELS.find((m) => m.name === selectedModel2)?.displayName ||
+                              selectedModel2}
+                            {isModelDropdownOpen2 ? (
+                              <ChevronUp className="w-3 h-3" />
+                            ) : (
+                              <ChevronDown className="w-3 h-3" />
+                            )}
+                          </motion.button>
+                          {/* Model Dropdown for Panel 2 */}
+                          {isModelDropdownOpen2 && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
+                            >
+                              <div className="p-2">
+                                <div className="mb-4">
+                                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Basic
+                                  </div>
+                                  {availableModels
+                                    .filter((model) => model.category === 'basic')
+                                    .map((model) => {
+                                      const isSelected = selectedModel2 === model.name;
+                                      const isDisabled = selectedModel === model.name;
+                                      return (
+                                        <motion.button
+                                          key={model.id}
+                                          onClick={() => {
+                                            if (!isDisabled) {
+                                              setSelectedModel2(model.name);
+                                              setIsModelDropdownOpen2(false);
+                                            }
+                                          }}
+                                          disabled={isDisabled}
+                                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                            : isDisabled
+                                              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                            }`}
+                                        >
+                                          <div className="flex-shrink-0">
+                                            {getModelImagePath(model.id) ? (
+                                              <img
+                                                src={getModelImagePath(model.id)!}
+                                                alt={model.displayName || model.name}
+                                                className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                                width={16}
+                                                height={16}
+                                              />
+                                            ) : (
+                                              <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                {getModelIcon(model.id)}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
+                                          {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                        </motion.button>
+                                      );
+                                    })}
+                                </div>
+                                <div className="mb-4">
+                                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                    Advanced
+                                  </div>
+                                  {availableModels
+                                    .filter((model) => model.category === 'advanced')
+                                    .map((model) => {
+                                      const isSelected = selectedModel2 === model.name;
+                                      const isDisabled = selectedModel === model.name;
+                                      return (
+                                        <motion.button
+                                          key={model.id}
+                                          onClick={() => {
+                                            if (!isDisabled) {
+                                              setSelectedModel2(model.name);
+                                              setIsModelDropdownOpen2(false);
+                                            }
+                                          }}
+                                          disabled={isDisabled}
+                                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                            : isDisabled
+                                              ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                            }`}
+                                        >
+                                          <div className="flex-shrink-0">
+                                            {getModelImagePath(model.id) ? (
+                                              <img
+                                                src={getModelImagePath(model.id)!}
+                                                alt={model.displayName || model.name}
+                                                className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                                width={16}
+                                                height={16}
+                                              />
+                                            ) : (
+                                              <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                {getModelIcon(model.id)}
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
+                                          {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                                        </motion.button>
+                                      );
+                                    })}
+                                </div>
+
+                                {/* Other Models Option */}
+                                <div className="relative">
+                                  <motion.button
+                                    ref={otherModelsRef2}
+                                    onMouseEnter={() => {
+                                      if (otherModelsRef2.current && modelDropdownRef2.current) {
+                                        const buttonRect = otherModelsRef2.current.getBoundingClientRect();
+                                        const mainDropdownRect = modelDropdownRef2.current.getBoundingClientRect();
+                                        const viewportHeight = window.innerHeight;
+                                        const dropdownHeight = 256;
+                                        let top = buttonRect.top;
+                                        if (buttonRect.top + dropdownHeight > viewportHeight) {
+                                          top = viewportHeight - dropdownHeight - 8;
+                                          if (top < 8) {
+                                            top = 8;
+                                          }
+                                        }
+                                        const left = mainDropdownRect.right + 8;
+                                        setOtherModelsDropdownPosition2({ top, left });
+                                      }
+                                      setIsOtherModelsHovered2(true);
+                                    }}
+                                    onMouseLeave={() => setIsOtherModelsHovered2(false)}
+                                    onClick={() => {
+                                      setIsModelDropdownOpen2(false);
+                                    }}
+                                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                  >
+                                    <span className="text-sm font-medium">... Other Models</span>
+                                    <ChevronRight className="w-4 h-4" />
+                                  </motion.button>
+
+                                  {/* Other Models Hover Dropdown */}
+                                  {isOtherModelsHovered2 && otherModelsRef2.current && otherModelsDropdownPosition2.top > 0 && (
+                                    <>
+                                      {/* Invisible bridge to prevent hover loss */}
+                                      {modelDropdownRef2.current && (
+                                        <div
+                                          className="fixed z-[59] pointer-events-auto"
+                                          style={{
+                                            top: `${otherModelsDropdownPosition2.top}px`,
+                                            left: `${otherModelsDropdownPosition2.left}px`,
+                                            width: `${Math.max(8, otherModelsRef2.current.getBoundingClientRect().right - otherModelsDropdownPosition2.left + 8)}px`,
+                                            height: `${otherModelsRef2.current.getBoundingClientRect().height}px`,
+                                          }}
+                                          onMouseEnter={() => setIsOtherModelsHovered2(true)}
+                                        />
+                                      )}
+                                      <motion.div
+                                        ref={otherModelsDropdownRef2}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -10 }}
+                                        onMouseEnter={() => setIsOtherModelsHovered2(true)}
+                                        onMouseLeave={() => setIsOtherModelsHovered2(false)}
+                                        className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-64 overflow-y-auto"
+                                        style={{
+                                          top: `${otherModelsDropdownPosition2.top}px`,
+                                          left: `${otherModelsDropdownPosition2.left}px`,
+                                        }}
+                                      >
+                                        <div className="p-2">
+                                          {/* Additional Other Models */}
+                                          {filteredOtherModels.length > 0 && (
+                                            <div>
+                                              {filteredOtherModels.map((model) => {
+                                                const isSelected = selectedModel2 === model.name;
+                                                const isDisabled = selectedModel === model.name;
+                                                return (
+                                                  <motion.button
+                                                    key={model.id}
+                                                    onClick={() => {
+                                                      if (!isDisabled) {
+                                                        setSelectedModel2(model.name);
+                                                        setIsModelDropdownOpen2(false);
+                                                        setIsOtherModelsHovered2(false);
+                                                      }
+                                                    }}
+                                                    disabled={isDisabled}
+                                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                                      : isDisabled
+                                                        ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
+                                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                      }`}
+                                                  >
+                                                    <div className="flex-shrink-0">
+                                                      {getModelImagePath(model.id) ? (
+                                                        <img
+                                                          src={getModelImagePath(model.id)!}
+                                                          alt={model.displayName || model.name}
+                                                          className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                                          width={16}
+                                                          height={16}
+                                                        />
+                                                      ) : (
+                                                        <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                          {getModelIcon(model.id)}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                    <span className="text-sm font-medium flex-1">
+                                                      {model.displayName || model.name}
+                                                    </span>
+                                                    {model.id === 'claude-opus-4.1' && (
+                                                      <div className="flex items-center gap-1">
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
+                                                        <Star className="w-3 h-3 text-purple-500" />
+                                                      </div>
+                                                    )}
+                                                  </motion.button>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm relative">
-                                {message.content}
-                                {message.isGenerating && (
-                                  <span className="inline-block w-1.5 h-1.5 bg-gray-400 rounded-full ml-1 animate-pulse" />
+                            </motion.div>
+                          )}
+                        </div>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setIsPanel2Open(false)}
+                        className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                    {/* Panel 2 Messages */}
+                    <div className="flex-1 overflow-y-auto p-4">
+                      {messages2.length === 0 ? (
+                        <div className="text-center pt-12">
+                          <motion.h2
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
+                          >
+                            Hi,
+                          </motion.h2>
+                          <p className="text-lg text-gray-600 dark:text-gray-400">
+                            How can I assist you today?
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {messages2.map((message) => (
+                            <motion.div
+                              key={message.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              {message.role === 'assistant' ? (
+                                <div className="flex items-start gap-2 max-w-[85%]">
+                                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    {getSelectedModelImagePath(message.model || selectedModel2) ? (
+                                      <img
+                                        src={getSelectedModelImagePath(message.model || selectedModel2)!}
+                                        alt={message.model || selectedModel2}
+                                        className="w-full h-full object-contain rounded-full"
+                                        width={24}
+                                        height={24}
+                                      />
+                                    ) : (
+                                      <Sparkles className="w-3 h-3 text-white" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                      {availableModels.find((m) => m.name === (message.model || selectedModel2))?.displayName ||
+                                        OTHER_MODELS.find((m) => m.name === (message.model || selectedModel2))?.displayName ||
+                                        message.model || selectedModel2}
+                                    </div>
+                                    <div className="group">
+                                      <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm">
+                                        {message.content}
+
+                                        {message.isGenerating && (
+                                          <span className="inline-block w-2 h-2 bg-gray-400 rounded-full ml-1 animate-pulse" />
+                                        )}
+                                      </div>
+
+                                      {!message.isGenerating && (
+                                        <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button
+                                            onClick={() => handleCopyMessage(message.content)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Copy"
+                                          >
+                                            <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+
+                                          <button
+                                            onClick={() => handleAddToList(message.id)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Add to list"
+                                          >
+                                            <SquarePlus className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+
+                                          <button
+                                            onClick={() => handleRegenerate(message.id)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Regenerate"
+                                          >
+                                            <RotateCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+
+                                          <button
+                                            onClick={() => handleQuote(message.content)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Quote"
+                                          >
+                                            <Quote className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+
+                                          <button
+                                            onClick={() => handleShare(message.id)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Share"
+                                          >
+                                            <Share2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+
+                                          <button
+                                            onClick={() => handleReadAloud(message.content)}
+                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                            title="Read aloud"
+                                          >
+                                            <Volume2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
+                                  {message.images && message.images.length > 0 && (
+                                    <div className="mb-2 flex flex-wrap gap-2">
+                                      {message.images.map((imageUrl, idx) => (
+                                        <img
+                                          key={idx}
+                                          src={imageUrl}
+                                          alt={`Uploaded image ${idx + 1}`}
+                                          className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
+                                          onClick={() => handleImageClick(idx)}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                  {message.files && message.files.length > 0 && (
+                                    <div className="mb-2 flex flex-wrap gap-2">
+                                      {message.files.map((file, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
+                                        >
+                                          <FileText className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                                          <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[150px]">
+                                            {file.name}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {message.content && (
+                                    <p className="text-gray-900 dark:text-white">{message.content}</p>
+                                  )}
+                                </div>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-8">
+                <div className="max-w-4xl mx-auto">
+                  {messages.length === 0 ? (
+                    <div className="text-center">
+                      <motion.h1
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                        className="text-5xl font-bold text-gray-900 dark:text-white mb-2"
+                      >
+                        Hi,
+                      </motion.h1>
+                      <p className="text-xl text-gray-600 dark:text-gray-400 mb-12">
+                        How can I assist you today?
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        {suggestedPrompts.map((prompt, index) => (
+                          <motion.button
+                            key={index}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 + index * 0.1 }}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => handleSuggestedPrompt(prompt)}
+                            className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-left hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors group"
+                          >
+                            <span className="text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                              {prompt}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 inline-block ml-2 transition-colors" />
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {messages.map((message) => (
+                        <motion.div
+                          key={message.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {message.role === 'assistant' ? (
+                            <div className="flex items-start gap-3 max-w-[80%]">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                {getSelectedModelImagePath(message.model || selectedModel) ? (
+                                  <img
+                                    src={getSelectedModelImagePath(message.model || selectedModel)!}
+                                    alt={message.model || selectedModel}
+                                    className="w-full h-full object-contain rounded-full"
+                                    width={32}
+                                    height={32}
+                                  />
+                                ) : (
+                                  <Sparkles className="w-4 h-4 text-white" />
                                 )}
                               </div>
-                              {/* Action Buttons */}
-                              {!message.isGenerating && (
-                                  <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm">
+                              <div className="flex-1 group">
+                                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                                  {availableModels.find((m) => m.name === (message.model || selectedModel))?.displayName ||
+                                    OTHER_MODELS.find((m) => m.name === (message.model || selectedModel))?.displayName ||
+                                    message.model || selectedModel}
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-gray-900 dark:text-white shadow-sm relative">
+                                  {message.content}
+                                  {message.isGenerating && (
+                                    <span className="inline-block w-2 h-2 bg-gray-400 rounded-full ml-1 animate-pulse" />
+                                  )}
+                                </div>
+                                {/* Action Buttons */}
+                                {!message.isGenerating && (
+                                  <div className="flex justify-end items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                       onClick={() => handleCopyMessage(message.content)}
                                       className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
@@ -3632,433 +4213,10 @@ export default function Chat() {
                                     </button>
                                   </div>
                                 )}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
-                            {message.images && message.images.length > 0 && (
-                              <div className="mb-2 flex flex-wrap gap-2">
-                                {message.images.map((imageUrl, idx) => (
-                                  <img
-                                    key={idx}
-                                    src={imageUrl}
-                                    alt={`Uploaded image ${idx + 1}`}
-                                    className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
-                                    onClick={() => handleImageClick(idx)}
-                                    onError={(e) => {
-                                      console.error('Failed to load image:', imageUrl);
-                                      (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                    loading="lazy"
-                                  />
-                                ))}
-                              </div>
-                            )}
-                            {message.files && message.files.length > 0 && (
-                              <div className="mb-2 flex flex-wrap gap-2">
-                                {message.files.map((file, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
-                                  >
-                                    <FileText className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                                    <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[150px]">
-                                      {file.name}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {message.content && (
-                              <p className="text-gray-900 dark:text-white">{message.content}</p>
-                            )}
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Panel 2 - GPT-5 mini */}
-            {isPanel2Open && (
-              <div className="flex-1 flex flex-col relative">
-                {/* Panel Header */}
-                <div className="h-14 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-white dark:bg-gray-800">
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {getSelectedModelImagePath(selectedModel2) ? (
-                        <img
-                          src={getSelectedModelImagePath(selectedModel2)!}
-                          alt={selectedModel2}
-                          className="w-full h-full object-contain rounded-full"
-                          width={20}
-                          height={20}
-                        />
-                      ) : (
-                        <Sparkles className="w-3 h-3 text-white" />
-                      )}
-                    </div>
-                    <div ref={modelDropdownRef2} className="relative">
-                      <motion.button
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setIsModelDropdownOpen2(!isModelDropdownOpen2)}
-                        className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
-                      >
-                        {availableModels.find((m) => m.name === selectedModel2)?.displayName || 
-                         OTHER_MODELS.find((m) => m.name === selectedModel2)?.displayName || 
-                         selectedModel2}
-                        {isModelDropdownOpen2 ? (
-                          <ChevronUp className="w-3 h-3" />
-                        ) : (
-                          <ChevronDown className="w-3 h-3" />
-                        )}
-                      </motion.button>
-                      {/* Model Dropdown for Panel 2 */}
-                      {isModelDropdownOpen2 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 10 }}
-                          className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
-                        >
-                          <div className="p-2">
-                            <div className="mb-4">
-                              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Basic
-                              </div>
-                              {availableModels
-                                .filter((model) => model.category === 'basic')
-                                .map((model) => {
-                                  const isSelected = selectedModel2 === model.name;
-                                  const isDisabled = selectedModel === model.name;
-                                  return (
-                                    <motion.button
-                                      key={model.id}
-                                      onClick={() => {
-                                        if (!isDisabled) {
-                                          setSelectedModel2(model.name);
-                                          setIsModelDropdownOpen2(false);
-                                        }
-                                      }}
-                                      disabled={isDisabled}
-                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                        isSelected
-                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                          : isDisabled
-                                          ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                      }`}
-                                    >
-                                      <div className="flex-shrink-0">
-                                        {getModelImagePath(model.id) ? (
-                                          <img
-                                            src={getModelImagePath(model.id)!}
-                                            alt={model.displayName || model.name}
-                                            className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                            width={16}
-                                            height={16}
-                                          />
-                                        ) : (
-                                          <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                            {getModelIcon(model.id)}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
-                                      {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-                                    </motion.button>
-                                  );
-                                })}
-                            </div>
-                            <div className="mb-4">
-                              <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                Advanced
-                              </div>
-                              {availableModels
-                                .filter((model) => model.category === 'advanced')
-                                .map((model) => {
-                                  const isSelected = selectedModel2 === model.name;
-                                  const isDisabled = selectedModel === model.name;
-                                  return (
-                                    <motion.button
-                                      key={model.id}
-                                      onClick={() => {
-                                        if (!isDisabled) {
-                                          setSelectedModel2(model.name);
-                                          setIsModelDropdownOpen2(false);
-                                        }
-                                      }}
-                                      disabled={isDisabled}
-                                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                        isSelected
-                                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                          : isDisabled
-                                          ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                      }`}
-                                    >
-                                      <div className="flex-shrink-0">
-                                        {getModelImagePath(model.id) ? (
-                                          <img
-                                            src={getModelImagePath(model.id)!}
-                                            alt={model.displayName || model.name}
-                                            className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                            width={16}
-                                            height={16}
-                                          />
-                                        ) : (
-                                          <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                            {getModelIcon(model.id)}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <span className="text-sm font-medium flex-1">{model.displayName || model.name}</span>
-                                      {isSelected && <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
-                                    </motion.button>
-                                  );
-                                })}
-                            </div>
-
-                            {/* Other Models Option */}
-                            <div className="relative">
-                              <motion.button
-                                ref={otherModelsRef2}
-                                onMouseEnter={() => {
-                                  if (otherModelsRef2.current && modelDropdownRef2.current) {
-                                    const buttonRect = otherModelsRef2.current.getBoundingClientRect();
-                                    const mainDropdownRect = modelDropdownRef2.current.getBoundingClientRect();
-                                    const viewportHeight = window.innerHeight;
-                                    const dropdownHeight = 256;
-                                    let top = buttonRect.top;
-                                    if (buttonRect.top + dropdownHeight > viewportHeight) {
-                                      top = viewportHeight - dropdownHeight - 8;
-                                      if (top < 8) {
-                                        top = 8;
-                                      }
-                                    }
-                                    const left = mainDropdownRect.right + 8;
-                                    setOtherModelsDropdownPosition2({ top, left });
-                                  }
-                                  setIsOtherModelsHovered2(true);
-                                }}
-                                onMouseLeave={() => setIsOtherModelsHovered2(false)}
-                                onClick={() => {
-                                  setIsModelDropdownOpen2(false);
-                                }}
-                                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                              >
-                                <span className="text-sm font-medium">... Other Models</span>
-                                <ChevronRight className="w-4 h-4" />
-                              </motion.button>
-
-                              {/* Other Models Hover Dropdown */}
-                              {isOtherModelsHovered2 && otherModelsRef2.current && otherModelsDropdownPosition2.top > 0 && (
-                                <>
-                                  {/* Invisible bridge to prevent hover loss */}
-                                  {modelDropdownRef2.current && (
-                                    <div
-                                      className="fixed z-[59] pointer-events-auto"
-                                      style={{
-                                        top: `${otherModelsDropdownPosition2.top}px`,
-                                        left: `${otherModelsDropdownPosition2.left}px`,
-                                        width: `${Math.max(8, otherModelsRef2.current.getBoundingClientRect().right - otherModelsDropdownPosition2.left + 8)}px`,
-                                        height: `${otherModelsRef2.current.getBoundingClientRect().height}px`,
-                                      }}
-                                      onMouseEnter={() => setIsOtherModelsHovered2(true)}
-                                    />
-                                  )}
-                                  <motion.div
-                                    ref={otherModelsDropdownRef2}
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -10 }}
-                                    onMouseEnter={() => setIsOtherModelsHovered2(true)}
-                                    onMouseLeave={() => setIsOtherModelsHovered2(false)}
-                                    className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-64 overflow-y-auto"
-                                    style={{
-                                      top: `${otherModelsDropdownPosition2.top}px`,
-                                      left: `${otherModelsDropdownPosition2.left}px`,
-                                    }}
-                                  >
-                                    <div className="p-2">
-                                      {/* Additional Other Models */}
-                                      {filteredOtherModels.length > 0 && (
-                                        <div>
-                                          {filteredOtherModels.map((model) => {
-                                            const isSelected = selectedModel2 === model.name;
-                                            const isDisabled = selectedModel === model.name;
-                                            return (
-                                              <motion.button
-                                                key={model.id}
-                                                onClick={() => {
-                                                  if (!isDisabled) {
-                                                    setSelectedModel2(model.name);
-                                                    setIsModelDropdownOpen2(false);
-                                                    setIsOtherModelsHovered2(false);
-                                                  }
-                                                }}
-                                                disabled={isDisabled}
-                                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                                  isSelected
-                                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                                    : isDisabled
-                                                    ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-50'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                                }`}
-                                              >
-                                                <div className="flex-shrink-0">
-                                                  {getModelImagePath(model.id) ? (
-                                                    <img
-                                                      src={getModelImagePath(model.id)!}
-                                                      alt={model.displayName || model.name}
-                                                      className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                                      width={16}
-                                                      height={16}
-                                                    />
-                                                  ) : (
-                                                    <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                                      {getModelIcon(model.id)}
-                                                    </div>
-                                                  )}
-                                                </div>
-                                                <span className="text-sm font-medium flex-1">
-                                                  {model.displayName || model.name}
-                                                </span>
-                                                {model.id === 'claude-opus-4.1' && (
-                                                  <div className="flex items-center gap-1">
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
-                                                    <Star className="w-3 h-3 text-purple-500" />
-                                                  </div>
-                                                )}
-                                              </motion.button>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </motion.div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </div>
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setIsPanel2Open(false)}
-                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </motion.button>
-                </div>
-                {/* Panel 2 Messages */}
-                <div className="flex-1 overflow-y-auto p-4">
-                  {messages2.length === 0 ? (
-                    <div className="text-center pt-12">
-                      <motion.h2
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-2xl font-bold text-gray-900 dark:text-white mb-2"
-                      >
-                        Hi,
-                      </motion.h2>
-                      <p className="text-lg text-gray-600 dark:text-gray-400">
-                        How can I assist you today?
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {messages2.map((message) => (
-                        <motion.div
-                          key={message.id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          {message.role === 'assistant' ? (
-                            <div className="flex items-start gap-2 max-w-[85%]">
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                {getSelectedModelImagePath(message.model || selectedModel2) ? (
-                                  <img
-                                    src={getSelectedModelImagePath(message.model || selectedModel2)!}
-                                    alt={message.model || selectedModel2}
-                                    className="w-full h-full object-contain rounded-full"
-                                    width={24}
-                                    height={24}
-                                  />
-                                ) : (
-                                  <Sparkles className="w-3 h-3 text-white" />
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                  {availableModels.find((m) => m.name === (message.model || selectedModel2))?.displayName || 
-                                   OTHER_MODELS.find((m) => m.name === (message.model || selectedModel2))?.displayName || 
-                                   message.model || selectedModel2}
-                                </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-900 dark:text-white shadow-sm relative group">
-                                  {message.content}
-                                  {message.isGenerating && (
-                                    <span className="inline-block w-2 h-2 bg-gray-400 rounded-full ml-1 animate-pulse" />
-                                  )}
-                                  {/* Action Buttons */}
-                                  {!message.isGenerating && (
-                                    <div className="flex justify-end items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <button
-                                        onClick={() => handleCopyMessage(message.content)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Copy"
-                                      >
-                                        <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleAddToList(message.id)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Add to list"
-                                      >
-                                        <SquarePlus className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleRegenerate(message.id)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Regenerate"
-                                      >
-                                        <RotateCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleQuote(message.content)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Quote"
-                                      >
-                                        <Quote className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleShare(message.id)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Share"
-                                      >
-                                        <Share2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleReadAloud(message.content)}
-                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                        title="Read aloud"
-                                      >
-                                        <Volume2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
                               </div>
                             </div>
                           ) : (
-                            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-2 max-w-[85%] text-sm">
+                            <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-3 max-w-[80%]">
                               {message.images && message.images.length > 0 && (
                                 <div className="mb-2 flex flex-wrap gap-2">
                                   {message.images.map((imageUrl, idx) => (
@@ -4066,8 +4224,14 @@ export default function Chat() {
                                       key={idx}
                                       src={imageUrl}
                                       alt={`Uploaded image ${idx + 1}`}
-                                      className="max-w-[150px] max-h-[150px] rounded-lg object-contain cursor-pointer"
+                                      className="max-w-[200px] max-h-[200px] rounded-lg object-contain cursor-pointer"
                                       onClick={() => handleImageClick(idx)}
+                                      onError={(e) => {
+                                        console.error('Failed to load image:', imageUrl);
+                                        // Hide broken image
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                      loading="lazy"
                                     />
                                   ))}
                                 </div>
@@ -4080,7 +4244,7 @@ export default function Chat() {
                                       className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
                                     >
                                       <FileText className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                                      <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[150px]">
+                                      <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[200px]">
                                         {file.name}
                                       </span>
                                     </div>
@@ -4094,1039 +4258,861 @@ export default function Chat() {
                           )}
                         </motion.div>
                       ))}
+                      <div ref={messagesEndRef} />
                     </div>
                   )}
                 </div>
               </div>
             )}
-          </div>
-        ) : (
-        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-4xl mx-auto">
-            {messages.length === 0 ? (
-              <div className="text-center">
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-5xl font-bold text-gray-900 dark:text-white mb-2"
-                >
-                  Hi,
-                </motion.h1>
-                <p className="text-xl text-gray-600 dark:text-gray-400 mb-12">
-                  How can I assist you today?
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                  {suggestedPrompts.map((prompt, index) => (
-                    <motion.button
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + index * 0.1 }}
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleSuggestedPrompt(prompt)}
-                      className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-left hover:border-indigo-500 dark:hover:border-indigo-500 transition-colors group"
-                    >
-                      <span className="text-gray-700 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                        {prompt}
-                      </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 inline-block ml-2 transition-colors" />
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {messages.map((message) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {message.role === 'assistant' ? (
-                      <div className="flex items-start gap-3 max-w-[80%]">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {getSelectedModelImagePath(message.model || selectedModel) ? (
-                            <img
-                              src={getSelectedModelImagePath(message.model || selectedModel)!}
-                              alt={message.model || selectedModel}
-                              className="w-full h-full object-contain rounded-full"
-                              width={32}
-                              height={32}
-                            />
-                          ) : (
-                            <Sparkles className="w-4 h-4 text-white" />
-                          )}
-                        </div>
-                        <div className="flex-1 group">
-                          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                            {availableModels.find((m) => m.name === (message.model || selectedModel))?.displayName || 
-                             OTHER_MODELS.find((m) => m.name === (message.model || selectedModel))?.displayName || 
-                             message.model || selectedModel}
-                          </div>
-                          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 text-gray-900 dark:text-white shadow-sm relative">
-                            {message.content}
-                            {message.isGenerating && (
-                              <span className="inline-block w-2 h-2 bg-gray-400 rounded-full ml-1 animate-pulse" />
-                            )}
-                          </div>
-                            {/* Action Buttons */}
-                            {!message.isGenerating && (
-                              <div className="flex justify-end items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => handleCopyMessage(message.content)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Copy"
-                                >
-                                  <Copy className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleAddToList(message.id)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Add to list"
-                                >
-                                  <SquarePlus className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleRegenerate(message.id)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Regenerate"
-                                >
-                                  <RotateCw className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleQuote(message.content)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Quote"
-                                >
-                                  <Quote className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleShare(message.id)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Share"
-                                >
-                                  <Share2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                                <button
-                                  onClick={() => handleReadAloud(message.content)}
-                                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                  title="Read aloud"
-                                >
-                                  <Volume2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                                </button>
-                              </div>
-                            )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-3 max-w-[80%]">
-                        {message.images && message.images.length > 0 && (
-                          <div className="mb-2 flex flex-wrap gap-2">
-                            {message.images.map((imageUrl, idx) => (
-                              <img
-                                key={idx}
-                                src={imageUrl}
-                                alt={`Uploaded image ${idx + 1}`}
-                                className="max-w-[200px] max-h-[200px] rounded-lg object-contain cursor-pointer"
-                                onClick={() => handleImageClick(idx)}
-                                onError={(e) => {
-                                  console.error('Failed to load image:', imageUrl);
-                                  // Hide broken image
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                                loading="lazy"
-                              />
-                            ))}
-                          </div>
-                        )}
-                        {message.files && message.files.length > 0 && (
-                          <div className="mb-2 flex flex-wrap gap-2">
-                            {message.files.map((file, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <FileText className="w-5 h-5 text-purple-500 flex-shrink-0" />
-                                <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-1 max-w-[200px]">
-                                  {file.name}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {message.content && (
-                          <p className="text-gray-900 dark:text-white">{message.content}</p>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
-        </div>
-        )}
           </>
         )}
 
         {/* Input - Only show for chat view */}
         {activeView === 'chat' && (
-        <div className="dark:bg-gray-800 border-gray-200 dark:border-gray-700 p-4">
-          <div className="max-w-4xl mx-auto">
-            {/* All buttons in one line */}
-            <div className="flex items-center gap-2 mb-3">
-              {viewMode === 'single' && (
-              <div ref={modelDropdownRef} className="relative group">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                    className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
-                >
-                  <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {getSelectedModelImagePath(selectedModel) ? (
-                      <img
-                        src={getSelectedModelImagePath(selectedModel)!}
-                        alt={selectedModel}
-                        className="w-full h-full object-contain rounded-full"
-                        width={20}
-                        height={20}
-                      />
-                    ) : (
-                      <Zap className="w-3 h-3 text-white" />
-                    )}
-                  </div>
-                  {availableModels.find((m) => m.name === selectedModel)?.displayName || 
-                   OTHER_MODELS.find((m) => m.name === selectedModel)?.displayName || 
-                   selectedModel}
-                  {isModelDropdownOpen ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                  <ChevronDown className="w-4 h-4" />
-                  )}
-                </motion.button>
-                {/* Tooltip for Model Button */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  Switch model
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                </div>
-
-                {/* Model Dropdown */}
-                {isModelDropdownOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
-                  >
-                      <div className="p-2">
-                      {/* Basic Models Section */}
-                      <div className="mb-4">
-                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Basic
-                        </div>
-                        {availableModels
-                          .filter((model) => model.category === 'basic')
-                          .map((model) => {
-                            const isSelected = selectedModel === model.name;
-                            return (
-                          <motion.button
-                            key={model.id}
-                            onClick={() => {
-                                  setSelectedModel(model.name);
-                              setIsModelDropdownOpen(false);
-                            }}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                  isSelected
-                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                                <div className="flex-shrink-0">
-                                  {getModelImagePath(model.id) ? (
-                                    <img
-                                      src={getModelImagePath(model.id)!}
-                                      alt={model.displayName || model.name}
-                                      className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                      width={16}
-                                      height={16}
-                                    />
-                                  ) : (
-                                    <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                      {getModelIcon(model.id)}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className="text-sm font-medium flex-1">
-                                  {model.displayName || model.name}
-                            </span>
-                                {isSelected && (
-                                  <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                                )}
-                          </motion.button>
-                            );
-                          })}
-                      </div>
-
-                      {/* Advanced Models Section */}
-                      <div className="mb-4">
-                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                          Advanced
-                      </div>
-                        {availableModels
-                          .filter((model) => model.category === 'advanced')
-                          .map((model) => {
-                            const isSelected = selectedModel === model.name;
-                            return (
-                              <motion.button
-                                key={model.id}
-                                onClick={() => {
-                                  setSelectedModel(model.name);
-                                  setIsModelDropdownOpen(false);
-                                }}
-                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                  isSelected
-                                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                              >
-                                <div className="flex-shrink-0">
-                                  {getModelImagePath(model.id) ? (
-                                    <img
-                                      src={getModelImagePath(model.id)!}
-                                      alt={model.displayName || model.name}
-                                      className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                      width={16}
-                                      height={16}
-                                    />
-                                  ) : (
-                                    <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                      {getModelIcon(model.id)}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className="text-sm font-medium flex-1">
-                                  {model.displayName || model.name}
-                                </span>
-                                {isSelected && (
-                                  <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                                )}
-                              </motion.button>
-                            );
-                          })}
-                      </div>
-
-                      {/* Other Models Option */}
-                      <div className="relative">
-                        <motion.button
-                          ref={otherModelsRef}
-                          onMouseEnter={() => setIsOtherModelsHovered(true)}
-                          onMouseLeave={() => setIsOtherModelsHovered(false)}
-                          onClick={() => {
-                            setIsModelDropdownOpen(false);
-                          }}
-                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          <span className="text-sm font-medium">... Other Models</span>
-                          <ChevronRight className="w-4 h-4" />
-                        </motion.button>
-
-                        {/* Other Models Hover Dropdown */}
-                        {isOtherModelsHovered && otherModelsRef.current && (
-                          <>
-                            {/* Invisible bridge to prevent hover loss */}
-                            {modelDropdownRef.current && (
-                              <div
-                                className="fixed z-[59] pointer-events-auto"
-                                style={{
-                                  top: `${otherModelsDropdownPosition.top}px`,
-                                  left: `${otherModelsDropdownPosition.left}px`,
-                                  width: `${Math.max(8, otherModelsRef.current.getBoundingClientRect().right - otherModelsDropdownPosition.left + 8)}px`,
-                                  height: `${otherModelsRef.current.getBoundingClientRect().height}px`,
-                                }}
-                                onMouseEnter={() => setIsOtherModelsHovered(true)}
-                              />
-                            )}
-                            <motion.div
-                              ref={otherModelsDropdownRef}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -10 }}
-                              onMouseEnter={() => setIsOtherModelsHovered(true)}
-                              onMouseLeave={() => setIsOtherModelsHovered(false)}
-                              className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-96 overflow-y-auto"
-                              style={{
-                                top: `${otherModelsDropdownPosition.top}px`,
-                                left: `${otherModelsDropdownPosition.left}px`,
-                              }}
-                            >
-                            <div className="p-2">
-                              {/* Additional Other Models */}
-                              {filteredOtherModels.length > 0 && (
-                                <div>
-                                  {filteredOtherModels.map((model) => {
-                                    const isSelected = selectedModel === model.name;
-                                    return (
-                                      <motion.button
-                                        key={model.id}
-                                        onClick={() => {
-                                          setSelectedModel(model.name);
-                                          setIsModelDropdownOpen(false);
-                                          setIsOtherModelsHovered(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                                          isSelected
-                                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                      >
-                                        <div className="flex-shrink-0">
-                                          {getModelImagePath(model.id) ? (
-                                            <img
-                                              src={getModelImagePath(model.id)!}
-                                              alt={model.displayName || model.name}
-                                              className="w-4 h-4 object-contain rounded flex-shrink-0"
-                                              width={16}
-                                              height={16}
-                                            />
-                                          ) : (
-                                            <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                              {getModelIcon(model.id)}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <span className="text-sm font-medium flex-1">
-                                          {model.displayName || model.name}
-                                        </span>
-                                        {model.id === 'claude-opus-4.1' && (
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
-                                            <Star className="w-3 h-3 text-purple-500" />
-                                          </div>
-                                        )}
-                                      </motion.button>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                            </motion.div>
-                          </>
+          <div className="dark:bg-gray-800 border-gray-200 dark:border-gray-700 p-4">
+            <div className="max-w-4xl mx-auto">
+              {/* All buttons in one line */}
+              <div className="flex items-center gap-2 mb-3">
+                {viewMode === 'single' && (
+                  <div ref={modelDropdownRef} className="relative group">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-sm flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-gray-900 dark:text-white shadow-sm"
+                    >
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {getSelectedModelImagePath(selectedModel) ? (
+                          <img
+                            src={getSelectedModelImagePath(selectedModel)!}
+                            alt={selectedModel}
+                            className="w-full h-full object-contain rounded-full"
+                            width={20}
+                            height={20}
+                          />
+                        ) : (
+                          <Zap className="w-3 h-3 text-white" />
                         )}
                       </div>
+                      {availableModels.find((m) => m.name === selectedModel)?.displayName ||
+                        OTHER_MODELS.find((m) => m.name === selectedModel)?.displayName ||
+                        selectedModel}
+                      {isModelDropdownOpen ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4" />
+                      )}
+                    </motion.button>
+                    {/* Tooltip for Model Button */}
+                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      Switch model
+                      <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
                     </div>
-                  </motion.div>
-                )}
-              </div>
-              )}
-              
-              {/* View Mode Buttons and Attachment - Always visible, in one line */}
-              {/* Single View Button */}
-              <div className="relative group">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setViewMode('single')}
-                  className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${
-                    viewMode === 'single'
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <Square className="w-5 h-5 stroke-2" />
-                </motion.button>
-                {/* Tooltip for Single View */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  Single view
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                </div>
-              </div>
-              
-              {/* Double View Button */}
-              <div className="relative group">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setViewMode('double');
-                    setIsPanel2Open(true);
-                  }}
-                  className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${
-                    viewMode === 'double'
-                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="w-5 h-5 flex items-center gap-0.5">
-                    <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
-                    <div className="w-px h-full bg-gray-300 dark:bg-gray-500" />
-                    <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
-                  </div>
-                </motion.button>
-                {/* Tooltip for Double View */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  Double view
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                </div>
-              </div>
-            
-              {/* Attachment Button */}
-              <div className="relative flex items-center group">
-                <motion.button
-                  ref={attachmentButtonRef}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleAttachmentClick}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <Paperclip className="w-5 h-5" />
-                </motion.button>
-              </div>
 
-              {/* Right Side Action Buttons */}
-              <div className="flex items-center gap-2 ml-auto">
-              {/* Chat Controls Button */}
-              <div className="relative flex items-center group">
-                <motion.button
-                  ref={chatControlsButtonRef}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setIsChatControlsOpen(!isChatControlsOpen)}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <Sliders className="w-5 h-5" />
-                </motion.button>
-                {/* Tooltip for Chat Controls */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  Chat controls
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                </div>
-                
-                {/* Chat Controls Dropdown */}
-                {isChatControlsOpen && (
-                  <motion.div
-                    ref={chatControlsRef}
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute bottom-full right-0 mb-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
-                  >
-                    <div className="p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Chat controls</h3>
-                      
-                      {/* Capabilities Section */}
-                      <div className="mb-6">
-                        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Capabilities</h4>
-                        
-                        {/* Artifacts */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
-                              <FolderPlus className="w-3 h-3 text-white" />
+                    {/* Model Dropdown */}
+                    {isModelDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto"
+                      >
+                        <div className="p-2">
+                          {/* Basic Models Section */}
+                          <div className="mb-4">
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Basic
                             </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Artifacts</span>
-                          </div>
-                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Search */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
-                              <Globe className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
-                          </div>
-                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Image */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center">
-                              <ImageIcon className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Image</span>
-                          </div>
-                          <div className="flex items-center gap-2 relative">
-                            <div className="relative">
-                              <motion.button
-                                ref={imageModelButtonRef}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setIsImageModelDropdownOpen(!isImageModelDropdownOpen)}
-                                className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
-                              >
-                                {selectedImageModel}
-                                <ChevronDown className="w-3 h-3" />
-                              </motion.button>
-                              
-                              {/* Image Model Dropdown */}
-                              {isImageModelDropdownOpen && (
-                                <motion.div
-                                  ref={imageModelDropdownRef}
-                                  initial={{ opacity: 0, y: -10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
-                                >
-                                  <div className="p-2">
-                                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 py-1 mb-1">
-                                      Select Generation Model
+                            {availableModels
+                              .filter((model) => model.category === 'basic')
+                              .map((model) => {
+                                const isSelected = selectedModel === model.name;
+                                return (
+                                  <motion.button
+                                    key={model.id}
+                                    onClick={() => {
+                                      setSelectedModel(model.name);
+                                      setIsModelDropdownOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                      }`}
+                                  >
+                                    <div className="flex-shrink-0">
+                                      {getModelImagePath(model.id) ? (
+                                        <img
+                                          src={getModelImagePath(model.id)!}
+                                          alt={model.displayName || model.name}
+                                          className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                          width={16}
+                                          height={16}
+                                        />
+                                      ) : (
+                                        <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                          {getModelIcon(model.id)}
+                                        </div>
+                                      )}
                                     </div>
-                                    {[
-                                      { name: 'Nano Banana', description: 'Gemini 2.5 Flash Image Preview', credits: '5', icon: Sparkles, color: 'text-purple-500' },
-                                      { name: 'Low', description: 'GPT-image-1', credits: '10', icon: Zap, color: 'text-green-500' },
-                                      { name: 'Medium', description: 'GPT-image-1', credits: '5', icon: Sparkles, color: 'text-purple-500' },
-                                      { name: 'High', description: 'GPT-image-1', credits: '20', icon: Sparkles, color: 'text-purple-500' },
-                                    ].map((model) => {
-                                      const IconComponent = model.icon;
-                                      return (
-                                        <motion.button
-                                          key={model.name}
-                                          whileHover={{ scale: 1.02 }}
-                                          whileTap={{ scale: 0.98 }}
-                                          onClick={() => {
-                                            setSelectedImageModel(model.name);
-                                            setIsImageModelDropdownOpen(false);
-                                          }}
-                                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors mb-1 ${
-                                            selectedImageModel === model.name
-                                              ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
-                                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-3 flex-1">
-                                            <IconComponent className={`w-4 h-4 ${model.color}`} />
-                                            <div className="flex-1">
-                                              <div className="text-sm font-medium">{model.name}</div>
-                                              <div className="text-xs text-gray-500 dark:text-gray-400">{model.description}</div>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-1">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">{model.credits}</span>
-                                            <Sparkles className="w-3 h-3 text-purple-500" />
-                                          </div>
-                                        </motion.button>
-                                      );
-                                    })}
-                                  </div>
-                                </motion.div>
-                              )}
+                                    <span className="text-sm font-medium flex-1">
+                                      {model.displayName || model.name}
+                                    </span>
+                                    {isSelected && (
+                                      <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                    )}
+                                  </motion.button>
+                                );
+                              })}
+                          </div>
+
+                          {/* Advanced Models Section */}
+                          <div className="mb-4">
+                            <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                              Advanced
                             </div>
-                            <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                              <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                            </div>
+                            {availableModels
+                              .filter((model) => model.category === 'advanced')
+                              .map((model) => {
+                                const isSelected = selectedModel === model.name;
+                                return (
+                                  <motion.button
+                                    key={model.id}
+                                    onClick={() => {
+                                      setSelectedModel(model.name);
+                                      setIsModelDropdownOpen(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                      }`}
+                                  >
+                                    <div className="flex-shrink-0">
+                                      {getModelImagePath(model.id) ? (
+                                        <img
+                                          src={getModelImagePath(model.id)!}
+                                          alt={model.displayName || model.name}
+                                          className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                          width={16}
+                                          height={16}
+                                        />
+                                      ) : (
+                                        <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                          {getModelIcon(model.id)}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-sm font-medium flex-1">
+                                      {model.displayName || model.name}
+                                    </span>
+                                    {isSelected && (
+                                      <Zap className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                                    )}
+                                  </motion.button>
+                                );
+                              })}
                           </div>
-                        </div>
-                        
-                        {/* Data Analysis */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
-                              <BarChart3 className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Data Analysis</span>
-                          </div>
-                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Think (R1) */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center">
-                              <Brain className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Think (R1)</span>
-                          </div>
-                          <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                            <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Personalization Section */}
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Personalization</h4>
-                        
-                        {/* Custom Instructions */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
-                              <FileText className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Custom Instructions</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Edit className="w-4 h-4 text-gray-500 dark:text-gray-400 cursor-pointer" />
-                            <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
-                              <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Response language */}
-                        <div className="flex items-center justify-between py-2">
-                          <div className="flex items-center gap-3">
-                            <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
-                              <Languages className="w-3 h-3 text-white" />
-                            </div>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Response language</span>
-                          </div>
+
+                          {/* Other Models Option */}
                           <div className="relative">
                             <motion.button
-                              ref={languageButtonRef}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
-                              className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                              ref={otherModelsRef}
+                              onMouseEnter={() => setIsOtherModelsHovered(true)}
+                              onMouseLeave={() => setIsOtherModelsHovered(false)}
+                              onClick={() => {
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                             >
-                              {selectedLanguage}
-                              <ChevronUp className="w-3 h-3" />
+                              <span className="text-sm font-medium">... Other Models</span>
+                              <ChevronRight className="w-4 h-4" />
                             </motion.button>
-                            
-                            {/* Language Dropdown */}
-                            {isLanguageDropdownOpen && (
-                              <motion.div
-                                ref={languageDropdownRef}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                className="absolute bottom-full right-0 mb-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
-                              >
-                                {/* Search Bar */}
-                                <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-                                  <div className="relative">
-                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                    <input
-                                      type="text"
-                                      value={languageSearch}
-                                      onChange={(e) => setLanguageSearch(e.target.value)}
-                                      placeholder="Search"
-                                      className="w-full pl-8 pr-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    />
+
+                            {/* Other Models Hover Dropdown */}
+                            {isOtherModelsHovered && otherModelsRef.current && (
+                              <>
+                                {/* Invisible bridge to prevent hover loss */}
+                                {modelDropdownRef.current && (
+                                  <div
+                                    className="fixed z-[59] pointer-events-auto"
+                                    style={{
+                                      top: `${otherModelsDropdownPosition.top}px`,
+                                      left: `${otherModelsDropdownPosition.left}px`,
+                                      width: `${Math.max(8, otherModelsRef.current.getBoundingClientRect().right - otherModelsDropdownPosition.left + 8)}px`,
+                                      height: `${otherModelsRef.current.getBoundingClientRect().height}px`,
+                                    }}
+                                    onMouseEnter={() => setIsOtherModelsHovered(true)}
+                                  />
+                                )}
+                                <motion.div
+                                  ref={otherModelsDropdownRef}
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  exit={{ opacity: 0, x: -10 }}
+                                  onMouseEnter={() => setIsOtherModelsHovered(true)}
+                                  onMouseLeave={() => setIsOtherModelsHovered(false)}
+                                  className="fixed w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] max-h-96 overflow-y-auto"
+                                  style={{
+                                    top: `${otherModelsDropdownPosition.top}px`,
+                                    left: `${otherModelsDropdownPosition.left}px`,
+                                  }}
+                                >
+                                  <div className="p-2">
+                                    {/* Additional Other Models */}
+                                    {filteredOtherModels.length > 0 && (
+                                      <div>
+                                        {filteredOtherModels.map((model) => {
+                                          const isSelected = selectedModel === model.name;
+                                          return (
+                                            <motion.button
+                                              key={model.id}
+                                              onClick={() => {
+                                                setSelectedModel(model.name);
+                                                setIsModelDropdownOpen(false);
+                                                setIsOtherModelsHovered(false);
+                                              }}
+                                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${isSelected
+                                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                }`}
+                                            >
+                                              <div className="flex-shrink-0">
+                                                {getModelImagePath(model.id) ? (
+                                                  <img
+                                                    src={getModelImagePath(model.id)!}
+                                                    alt={model.displayName || model.name}
+                                                    className="w-4 h-4 object-contain rounded flex-shrink-0"
+                                                    width={16}
+                                                    height={16}
+                                                  />
+                                                ) : (
+                                                  <div className={`${isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    {getModelIcon(model.id)}
+                                                  </div>
+                                                )}
+                                              </div>
+                                              <span className="text-sm font-medium flex-1">
+                                                {model.displayName || model.name}
+                                              </span>
+                                              {model.id === 'claude-opus-4.1' && (
+                                                <div className="flex items-center gap-1">
+                                                  <span className="text-xs text-gray-500 dark:text-gray-400">10</span>
+                                                  <Star className="w-3 h-3 text-purple-500" />
+                                                </div>
+                                              )}
+                                            </motion.button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
-                                
-                                {/* Language List */}
-                                <div className="max-h-64 overflow-y-auto">
-                                  {[
-                                    { name: 'Auto', nativeName: '' },
-                                    { name: 'English', nativeName: 'English' },
-                                    { name: 'Simplified Chinese', nativeName: '中文(简体)' },
-                                    { name: 'Traditional Chinese', nativeName: '中文(繁體)' },
-                                    { name: 'Spanish', nativeName: 'Español' },
-                                    { name: 'French', nativeName: 'Français' },
-                                    { name: 'German', nativeName: 'Deutsch' },
-                                    { name: 'Italian', nativeName: 'Italiano' },
-                                    { name: 'Portuguese', nativeName: 'Português' },
-                                    { name: 'Russian', nativeName: 'Русский' },
-                                    { name: 'Japanese', nativeName: '日本語' },
-                                    { name: 'Korean', nativeName: '한국어' },
-                                    { name: 'Arabic', nativeName: 'العربية' },
-                                    { name: 'Hindi', nativeName: 'हिन्दी' },
-                                    { name: 'Dutch', nativeName: 'Nederlands' },
-                                    { name: 'Polish', nativeName: 'Polski' },
-                                    { name: 'Turkish', nativeName: 'Türkçe' },
-                                    { name: 'Vietnamese', nativeName: 'Tiếng Việt' },
-                                    { name: 'Thai', nativeName: 'ไทย' },
-                                    { name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
-                                    { name: 'Swedish', nativeName: 'Svenska' },
-                                    { name: 'Norwegian', nativeName: 'Norsk' },
-                                    { name: 'Danish', nativeName: 'Dansk' },
-                                    { name: 'Finnish', nativeName: 'Suomi' },
-                                    { name: 'Greek', nativeName: 'Ελληνικά' },
-                                    { name: 'Hebrew', nativeName: 'עברית' },
-                                    { name: 'Czech', nativeName: 'Čeština' },
-                                    { name: 'Romanian', nativeName: 'Română' },
-                                    { name: 'Hungarian', nativeName: 'Magyar' },
-                                  ]
-                                    .filter((lang) => {
-                                      if (!languageSearch.trim()) return true;
-                                      const searchLower = languageSearch.toLowerCase();
-                                      return (
-                                        lang.name.toLowerCase().includes(searchLower) ||
-                                        lang.nativeName.toLowerCase().includes(searchLower)
-                                      );
-                                    })
-                                    .map((lang) => (
-                                      <motion.button
-                                        key={lang.name}
-                                        whileHover={{ scale: 1.01 }}
-                                        whileTap={{ scale: 0.99 }}
-                                        onClick={() => {
-                                          setSelectedLanguage(lang.name);
-                                          setIsLanguageDropdownOpen(false);
-                                          setLanguageSearch('');
-                                        }}
-                                        className={`w-full flex flex-col items-start px-3 py-2.5 text-left transition-colors ${
-                                          selectedLanguage === lang.name
-                                            ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
-                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                        }`}
-                                      >
-                                        <div className="text-sm font-medium">{lang.name}</div>
-                                        {lang.nativeName && (
-                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                            {lang.nativeName}
-                                          </div>
-                                        )}
-                                      </motion.button>
-                                    ))}
-                                </div>
-                              </motion.div>
+                                </motion.div>
+                              </>
                             )}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  </motion.div>
+                      </motion.div>
+                    )}
+                  </div>
                 )}
-              </div>
 
-              {/* Chat History Button */}
-              <div className="relative flex items-center group">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={async () => {
-                    const newState = !isChatHistoryOpen;
-                    setIsChatHistoryOpen(newState);
-                    if (newState) {
-                      await listConversations();
-                    }
-                  }}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <History className="w-5 h-5" />
-                </motion.button>
-                {/* Tooltip for Chat History */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  Chat history
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                {/* View Mode Buttons and Attachment - Always visible, in one line */}
+                {/* Single View Button */}
+                <div className="relative group">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setViewMode('single')}
+                    className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${viewMode === 'single'
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                  >
+                    <Square className="w-5 h-5 stroke-2" />
+                  </motion.button>
+                  {/* Tooltip for Single View */}
+                  <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    Single view
+                    <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                  </div>
                 </div>
-              </div>
 
-              {/* New Chat Button */}
-              <div className="relative flex items-center group">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleNewChat}
-                  className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  <MessageCircle className="w-5 h-5 text-purple-500" />
-                  <Plus className="w-3 h-3 text-purple-500 absolute -top-0.5 -right-0.5 bg-white rounded-full" />
-                </motion.button>
-                {/* Tooltip for New Chat */}
-                <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  New chat
-                  <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                {/* Double View Button */}
+                <div className="relative group">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      setViewMode('double');
+                      setIsPanel2Open(true);
+                    }}
+                    className={`p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors ${viewMode === 'double'
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                  >
+                    <div className="w-5 h-5 flex items-center gap-0.5">
+                      <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
+                      <div className="w-px h-full bg-gray-300 dark:bg-gray-500" />
+                      <div className="flex-1 h-full border border-gray-600 dark:border-gray-400 rounded-sm" />
+                    </div>
+                  </motion.button>
+                  {/* Tooltip for Double View */}
+                  <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                    Double view
+                    <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                  </div>
                 </div>
-              </div>
-              </div>
-            </div>
 
-            <div className="relative bg-gray-50 dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 min-h-[120px]">
-              {/* File Previews */}
-              {filePreviews.length > 0 && (
-                <div className="mb-4">
-                  {/* All Images in One Section */}
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {filePreviews.map((preview, index) => {
-                      console.log(`Rendering preview ${index}:`, preview.file.name, preview.preview);
-                      return (
-                        <div
-                          key={`${preview.file.name}-${index}`}
-                          className="relative rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-center items-center"
-                          style={{ width: '14%', minWidth: '80px', height: '128px' }}
-                        >
-                          {preview.isUploading ? (
-                            <div className="flex flex-col items-center justify-center gap-2 w-full h-full">
-                              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
-                              <span className="text-xs text-gray-500 dark:text-gray-400">Uploading...</span>
-                            </div>
-                          ) : (
-                            <>
-                              {preview.isImage ? (
-                                <img
-                                  src={preview.preview}
-                                  alt={preview.file.name}
-                                  className="max-h-32 w-auto object-contain cursor-pointer"
-                                  onClick={() => handleImageClick(index)}
-                                  onError={() => {
-                                    console.error('Image failed to load:', preview.preview, preview.file.name);
-                                  }}
-                                  onLoad={() => {
-                                    console.log('Image loaded successfully:', preview.file.name);
-                                  }}
-                                />
-                              ) : (
-                                <div className="flex flex-col items-center justify-center w-full h-full p-3 text-center gap-2">
-                                  <FileText className="w-8 h-8 text-purple-500" />
-                                  <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
-                                    {preview.file.name}
-                                  </span>
+                {/* Attachment Button */}
+                <div className="relative flex items-center group">
+                  <motion.button
+                    ref={attachmentButtonRef}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleAttachmentClick}
+                    className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </motion.button>
+                </div>
+
+                {/* Right Side Action Buttons */}
+                <div className="flex items-center gap-2 ml-auto">
+                  {/* Chat Controls Button */}
+                  <div className="relative flex items-center group">
+                    <motion.button
+                      ref={chatControlsButtonRef}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setIsChatControlsOpen(!isChatControlsOpen)}
+                      className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      <Sliders className="w-5 h-5" />
+                    </motion.button>
+                    {/* Tooltip for Chat Controls */}
+                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      Chat controls
+                      <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+
+                    {/* Chat Controls Dropdown */}
+                    {isChatControlsOpen && (
+                      <motion.div
+                        ref={chatControlsRef}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute bottom-full right-0 mb-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50"
+                      >
+                        <div className="p-4">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Chat controls</h3>
+
+                          {/* Capabilities Section */}
+                          <div className="mb-6">
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Capabilities</h4>
+
+                            {/* Artifacts */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-green-500 flex items-center justify-center">
+                                  <FolderPlus className="w-3 h-3 text-white" />
                                 </div>
-                              )}
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleRemoveFile(index)}
-                                className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
-                                title="Remove"
-                              >
-                                <X className="w-3 h-3" />
-                              </motion.button>
-                            </>
-                          )}
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Artifacts</span>
+                              </div>
+                              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                              </div>
+                            </div>
+
+                            {/* Search */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                                  <Globe className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Search</span>
+                              </div>
+                              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                              </div>
+                            </div>
+
+                            {/* Image */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-orange-500 flex items-center justify-center">
+                                  <ImageIcon className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Image</span>
+                              </div>
+                              <div className="flex items-center gap-2 relative">
+                                <div className="relative">
+                                  <motion.button
+                                    ref={imageModelButtonRef}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => setIsImageModelDropdownOpen(!isImageModelDropdownOpen)}
+                                    className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                  >
+                                    {selectedImageModel}
+                                    <ChevronDown className="w-3 h-3" />
+                                  </motion.button>
+
+                                  {/* Image Model Dropdown */}
+                                  {isImageModelDropdownOpen && (
+                                    <motion.div
+                                      ref={imageModelDropdownRef}
+                                      initial={{ opacity: 0, y: -10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
+                                    >
+                                      <div className="p-2">
+                                        <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider px-2 py-1 mb-1">
+                                          Select Generation Model
+                                        </div>
+                                        {[
+                                          { name: 'Nano Banana', description: 'Gemini 2.5 Flash Image Preview', credits: '5', icon: Sparkles, color: 'text-purple-500' },
+                                          { name: 'Low', description: 'GPT-image-1', credits: '10', icon: Zap, color: 'text-green-500' },
+                                          { name: 'Medium', description: 'GPT-image-1', credits: '5', icon: Sparkles, color: 'text-purple-500' },
+                                          { name: 'High', description: 'GPT-image-1', credits: '20', icon: Sparkles, color: 'text-purple-500' },
+                                        ].map((model) => {
+                                          const IconComponent = model.icon;
+                                          return (
+                                            <motion.button
+                                              key={model.name}
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.98 }}
+                                              onClick={() => {
+                                                setSelectedImageModel(model.name);
+                                                setIsImageModelDropdownOpen(false);
+                                              }}
+                                              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-colors mb-1 ${selectedImageModel === model.name
+                                                ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                }`}
+                                            >
+                                              <div className="flex items-center gap-3 flex-1">
+                                                <IconComponent className={`w-4 h-4 ${model.color}`} />
+                                                <div className="flex-1">
+                                                  <div className="text-sm font-medium">{model.name}</div>
+                                                  <div className="text-xs text-gray-500 dark:text-gray-400">{model.description}</div>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{model.credits}</span>
+                                                <Sparkles className="w-3 h-3 text-purple-500" />
+                                              </div>
+                                            </motion.button>
+                                          );
+                                        })}
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </div>
+                                <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                  <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Data Analysis */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                                  <BarChart3 className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Data Analysis</span>
+                              </div>
+                              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                              </div>
+                            </div>
+
+                            {/* Think (R1) */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-cyan-500 flex items-center justify-center">
+                                  <Brain className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Think (R1)</span>
+                              </div>
+                              <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Personalization Section */}
+                          <div>
+                            <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Personalization</h4>
+
+                            {/* Custom Instructions */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                                  <FileText className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Custom Instructions</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Edit className="w-4 h-4 text-gray-500 dark:text-gray-400 cursor-pointer" />
+                                <div className="w-10 h-5 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer">
+                                  <div className="w-4 h-4 bg-white rounded-full absolute left-0.5 top-0.5 transition-transform"></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Response language */}
+                            <div className="flex items-center justify-between py-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-5 h-5 rounded bg-purple-500 flex items-center justify-center">
+                                  <Languages className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="text-sm text-gray-700 dark:text-gray-300">Response language</span>
+                              </div>
+                              <div className="relative">
+                                <motion.button
+                                  ref={languageButtonRef}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                                  className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                >
+                                  {selectedLanguage}
+                                  <ChevronUp className="w-3 h-3" />
+                                </motion.button>
+
+                                {/* Language Dropdown */}
+                                {isLanguageDropdownOpen && (
+                                  <motion.div
+                                    ref={languageDropdownRef}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="absolute bottom-full right-0 mb-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-[60] overflow-hidden"
+                                  >
+                                    {/* Search Bar */}
+                                    <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                                      <div className="relative">
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <input
+                                          type="text"
+                                          value={languageSearch}
+                                          onChange={(e) => setLanguageSearch(e.target.value)}
+                                          placeholder="Search"
+                                          className="w-full pl-8 pr-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Language List */}
+                                    <div className="max-h-64 overflow-y-auto">
+                                      {[
+                                        { name: 'Auto', nativeName: '' },
+                                        { name: 'English', nativeName: 'English' },
+                                        { name: 'Simplified Chinese', nativeName: '中文(简体)' },
+                                        { name: 'Traditional Chinese', nativeName: '中文(繁體)' },
+                                        { name: 'Spanish', nativeName: 'Español' },
+                                        { name: 'French', nativeName: 'Français' },
+                                        { name: 'German', nativeName: 'Deutsch' },
+                                        { name: 'Italian', nativeName: 'Italiano' },
+                                        { name: 'Portuguese', nativeName: 'Português' },
+                                        { name: 'Russian', nativeName: 'Русский' },
+                                        { name: 'Japanese', nativeName: '日本語' },
+                                        { name: 'Korean', nativeName: '한국어' },
+                                        { name: 'Arabic', nativeName: 'العربية' },
+                                        { name: 'Hindi', nativeName: 'हिन्दी' },
+                                        { name: 'Dutch', nativeName: 'Nederlands' },
+                                        { name: 'Polish', nativeName: 'Polski' },
+                                        { name: 'Turkish', nativeName: 'Türkçe' },
+                                        { name: 'Vietnamese', nativeName: 'Tiếng Việt' },
+                                        { name: 'Thai', nativeName: 'ไทย' },
+                                        { name: 'Indonesian', nativeName: 'Bahasa Indonesia' },
+                                        { name: 'Swedish', nativeName: 'Svenska' },
+                                        { name: 'Norwegian', nativeName: 'Norsk' },
+                                        { name: 'Danish', nativeName: 'Dansk' },
+                                        { name: 'Finnish', nativeName: 'Suomi' },
+                                        { name: 'Greek', nativeName: 'Ελληνικά' },
+                                        { name: 'Hebrew', nativeName: 'עברית' },
+                                        { name: 'Czech', nativeName: 'Čeština' },
+                                        { name: 'Romanian', nativeName: 'Română' },
+                                        { name: 'Hungarian', nativeName: 'Magyar' },
+                                      ]
+                                        .filter((lang) => {
+                                          if (!languageSearch.trim()) return true;
+                                          const searchLower = languageSearch.toLowerCase();
+                                          return (
+                                            lang.name.toLowerCase().includes(searchLower) ||
+                                            lang.nativeName.toLowerCase().includes(searchLower)
+                                          );
+                                        })
+                                        .map((lang) => (
+                                          <motion.button
+                                            key={lang.name}
+                                            whileHover={{ scale: 1.01 }}
+                                            whileTap={{ scale: 0.99 }}
+                                            onClick={() => {
+                                              setSelectedLanguage(lang.name);
+                                              setIsLanguageDropdownOpen(false);
+                                              setLanguageSearch('');
+                                            }}
+                                            className={`w-full flex flex-col items-start px-3 py-2.5 text-left transition-colors ${selectedLanguage === lang.name
+                                              ? 'bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white'
+                                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                              }`}
+                                          >
+                                            <div className="text-sm font-medium">{lang.name}</div>
+                                            {lang.nativeName && (
+                                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {lang.nativeName}
+                                              </div>
+                                            )}
+                                          </motion.button>
+                                        ))}
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      );
-                    })}
+                      </motion.div>
+                    )}
                   </div>
 
-                  {/* Action Buttons - Shared for all images */}
-                  <div className="flex items-center justify-between gap-2">
+                  {/* Chat History Button */}
+                  <div className="relative flex items-center group">
                     <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleExtractText()}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={async () => {
+                        const newState = !isChatHistoryOpen;
+                        setIsChatHistoryOpen(newState);
+                        if (newState) {
+                          await listConversations();
+                        }
+                      }}
+                      className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
-                      <FileText className="w-4 h-4 text-indigo-500" />
-                      Extract Text
+                      <History className="w-5 h-5" />
                     </motion.button>
+                    {/* Tooltip for Chat History */}
+                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      Chat history
+                      <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+                  </div>
 
+                  {/* New Chat Button */}
+                  <div className="relative flex items-center group">
                     <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleMathSolver()}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleNewChat}
+                      className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
-                      <Calculator className="w-4 h-4 text-green-500" />
-                      Math Solver
+                      <MessageCircle className="w-5 h-5 text-purple-500" />
+                      <Plus className="w-3 h-3 text-purple-500 absolute -top-0.5 -right-0.5 bg-white rounded-full" />
                     </motion.button>
+                    {/* Tooltip for New Chat */}
+                    <div className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white text-sm rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      New chat
+                      <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                    <div className="relative flex-1">
+              <div className="relative bg-gray-50 dark:bg-gray-900 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 min-h-[120px]">
+                {/* File Previews */}
+                {filePreviews.length > 0 && (
+                  <div className="mb-4">
+                    {/* All Images in One Section */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {filePreviews.map((preview, index) => {
+                        console.log(`Rendering preview ${index}:`, preview.file.name, preview.preview);
+                        return (
+                          <div
+                            key={`${preview.file.name}-${index}`}
+                            className="relative rounded-lg overflow-hidden border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-center items-center"
+                            style={{ width: '14%', minWidth: '80px', height: '128px' }}
+                          >
+                            {preview.isUploading ? (
+                              <div className="flex flex-col items-center justify-center gap-2 w-full h-full">
+                                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Uploading...</span>
+                              </div>
+                            ) : (
+                              <>
+                                {preview.isImage ? (
+                                  <img
+                                    src={preview.preview}
+                                    alt={preview.file.name}
+                                    className="max-h-32 w-auto object-contain cursor-pointer"
+                                    onClick={() => handleImageClick(index)}
+                                    onError={() => {
+                                      console.error('Image failed to load:', preview.preview, preview.file.name);
+                                    }}
+                                    onLoad={() => {
+                                      console.log('Image loaded successfully:', preview.file.name);
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center w-full h-full p-3 text-center gap-2">
+                                    <FileText className="w-8 h-8 text-purple-500" />
+                                    <span className="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
+                                      {preview.file.name}
+                                    </span>
+                                  </div>
+                                )}
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleRemoveFile(index)}
+                                  className="absolute top-1 right-1 w-5 h-5 bg-black/60 text-white rounded-full flex items-center justify-center hover:bg-black/80 transition-opacity"
+                                  title="Remove"
+                                >
+                                  <X className="w-3 h-3" />
+                                </motion.button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Action Buttons - Shared for all images */}
+                    <div className="flex items-center justify-between gap-2">
                       <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={() =>
-                          setIsTranslateDropdownOpen(
-                            isTranslateDropdownOpen === null ? 0 : null
-                          )
-                        }
-                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                        onClick={() => handleExtractText()}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
                       >
-                        <Languages className="w-4 h-4 text-blue-500" />
-                        Translate
-                        <ChevronDownIcon className="w-3 h-3" />
+                        <FileText className="w-4 h-4 text-indigo-500" />
+                        Extract Text
                       </motion.button>
 
-                      {/* Translate Dropdown */}
-                      {isTranslateDropdownOpen !== null && (
-                        <motion.div
-                          ref={translateDropdownRef}
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
-                        >
-                          <div className="p-1">
-                            {languages.map((lang) => (
-                              <motion.button
-                                key={lang.code}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() =>
-                                  handleTranslate(lang.code, lang.name)
-                                }
-                                className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                              >
-                                {lang.name}
-                </motion.button>
-              ))}
-                          </div>
-                        </motion.div>
-                      )}
-            </div>
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleMathSolver()}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                      >
+                        <Calculator className="w-4 h-4 text-green-500" />
+                        Math Solver
+                      </motion.button>
 
+                      <div className="relative flex-1">
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() =>
+                            setIsTranslateDropdownOpen(
+                              isTranslateDropdownOpen === null ? 0 : null
+                            )
+                          }
+                          className="w-full flex items-center justify-center gap-2 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-sm font-medium text-gray-800 dark:text-gray-200 transition-all"
+                        >
+                          <Languages className="w-4 h-4 text-blue-500" />
+                          Translate
+                          <ChevronDownIcon className="w-3 h-3" />
+                        </motion.button>
+
+                        {/* Translate Dropdown */}
+                        {isTranslateDropdownOpen !== null && (
+                          <motion.div
+                            ref={translateDropdownRef}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-64 overflow-y-auto"
+                          >
+                            <div className="p-1">
+                              {languages.map((lang) => (
+                                <motion.button
+                                  key={lang.code}
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  onClick={() =>
+                                    handleTranslate(lang.code, lang.name)
+                                  }
+                                  className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                >
+                                  {lang.name}
+                                </motion.button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-end gap-2">
+                  {/* Hidden File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+
+                  <input
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Ask anything, @models, / prompts"
+                    className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  />
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+                      >
+                        <Lightbulb className="w-3.5 h-3.5" />
+                        Think
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                        Search
+                      </motion.button>
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2) ? handleStopGenerating : handleSendMessage}
+                      disabled={!inputValue.trim() && !(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2)}
+                      className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2) ? (
+                        <SquareIcon className="w-5 h-5" />
+                      ) : inputValue.trim() ? (
+                        <Send className="w-5 h-5" />
+                      ) : (
+                        <Mic className="w-5 h-5" />
+                      )}
+                    </motion.button>
                   </div>
                 </div>
-              )}
-
-               <div className="flex items-end gap-2">
-                {/* Hidden File Input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-
-                 <input
-                   type="text"
-                   value={inputValue}
-                   onChange={(e) => setInputValue(e.target.value)}
-                   onKeyPress={handleKeyPress}
-                   placeholder="Ask anything, @models, / prompts"
-                   className="flex-1 px-4 py-3 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                 />
-                 <div className="flex items-center gap-2">
-                   <div className="flex items-center gap-2">
-                     <motion.button
-                       whileHover={{ scale: 1.05 }}
-                       whileTap={{ scale: 0.95 }}
-                       className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
-                     >
-                       <Lightbulb className="w-3.5 h-3.5" />
-                       Think
-                     </motion.button>
-                     <motion.button
-                       whileHover={{ scale: 1.05 }}
-                       whileTap={{ scale: 0.95 }}
-                       className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5"
-                     >
-                       <Globe className="w-3.5 h-3.5" />
-                       Search
-                     </motion.button>
-                   </div>
-                   <motion.button
-                     whileHover={{ scale: 1.1 }}
-                     whileTap={{ scale: 0.9 }}
-                     onClick={(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2) ? handleStopGenerating : handleSendMessage}
-                     disabled={!inputValue.trim() && !(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2)}
-                     className="p-2 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                   >
-                    {(viewMode === 'single' ? isGenerating : isGenerating || isGenerating2) ? (
-                      <SquareIcon className="w-5 h-5" />
-                    ) : inputValue.trim() ? (
-                      <Send className="w-5 h-5" />
-                    ) : (
-                      <Mic className="w-5 h-5" />
-                    )}
-                   </motion.button>
-                 </div>
-               </div>
-             </div>
+              </div>
+            </div>
           </div>
-        </div>
         )}
       </main>
-      
+
       {/* User Profile Dropdown */}
       <UserProfileDropdown
         isOpen={isUserProfileOpen}
@@ -5140,160 +5126,158 @@ export default function Chat() {
           const { filePreview } = currentImageItem;
           const { file, preview } = filePreview;
           return (
-        <motion.div
-          ref={imageModalRef}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className={`fixed inset-0 bg-black/80 z-[100] flex items-center justify-center ${
-            isImageMinimized ? 'items-end' : ''
-          }`}
-          onClick={(e) => {
-            if (e.target === imageModalRef.current) {
-              handleCloseImageModal();
-            }
-          }}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ 
-              scale: isImageMinimized ? 0.3 : isImageMaximized ? 1 : 1,
-              opacity: 1,
-              width: isImageMinimized ? '300px' : isImageMaximized ? '95vw' : '80vw',
-              height: isImageMinimized ? '200px' : isImageMaximized ? '95vh' : '80vh',
-            }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden ${
-              isImageMinimized ? 'mb-4' : ''
-            }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4 z-10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-white text-sm font-medium">
-                  {file.name}
-                </span>
-                <span className="text-white/70 text-xs">
-                  {Math.round(imageZoom * 100)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Zoom Controls */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleZoomOut}
-                  disabled={imageZoom <= 0.5}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Zoom Out"
-                >
-                  <ZoomOut className="w-4 h-4" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleZoomIn}
-                  disabled={imageZoom >= 5}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Zoom In"
-                >
-                  <ZoomIn className="w-4 h-4" />
-                </motion.button>
-                {/* Minimize Button */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setIsImageMinimized(!isImageMinimized);
-                    if (isImageMaximized) setIsImageMaximized(false);
-                  }}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-                  title={isImageMinimized ? "Restore" : "Minimize"}
-                >
-                  <Minimize2 className="w-4 h-4" />
-                </motion.button>
-                {/* Maximize Button */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    setIsImageMaximized(!isImageMaximized);
-                    if (isImageMinimized) setIsImageMinimized(false);
-                  }}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-                  title={isImageMaximized ? "Restore" : "Maximize"}
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </motion.button>
-                {/* Close Button */}
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleCloseImageModal}
-                  className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-                  title="Close"
-                >
-                  <X className="w-4 h-4" />
-                </motion.button>
-              </div>
-            </div>
-
-            {/* Image Container */}
-            <div className="w-full h-full flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 p-4">
-              <motion.img
-                src={preview}
-                alt={file.name}
-                style={{ 
-                  transform: `scale(${imageZoom})`,
-                  maxWidth: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
+            <motion.div
+              ref={imageModalRef}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={`fixed inset-0 bg-black/80 z-[100] flex items-center justify-center ${isImageMinimized ? 'items-end' : ''
+                }`}
+              onClick={(e) => {
+                if (e.target === imageModalRef.current) {
+                  handleCloseImageModal();
+                }
+              }}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{
+                  scale: isImageMinimized ? 0.3 : isImageMaximized ? 1 : 1,
+                  opacity: 1,
+                  width: isImageMinimized ? '300px' : isImageMaximized ? '95vw' : '80vw',
+                  height: isImageMinimized ? '200px' : isImageMaximized ? '95vh' : '80vh',
                 }}
-                className="transition-transform duration-200"
-                draggable={false}
-              />
-            </div>
+                exit={{ scale: 0.9, opacity: 0 }}
+                className={`relative bg-white dark:bg-gray-800 rounded-lg shadow-2xl overflow-hidden ${isImageMinimized ? 'mb-4' : ''
+                  }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/60 to-transparent p-4 z-10 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium">
+                      {file.name}
+                    </span>
+                    <span className="text-white/70 text-xs">
+                      {Math.round(imageZoom * 100)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Zoom Controls */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleZoomOut}
+                      disabled={imageZoom <= 0.5}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleZoomIn}
+                      disabled={imageZoom >= 5}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </motion.button>
+                    {/* Minimize Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        setIsImageMinimized(!isImageMinimized);
+                        if (isImageMaximized) setIsImageMaximized(false);
+                      }}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title={isImageMinimized ? "Restore" : "Minimize"}
+                    >
+                      <Minimize2 className="w-4 h-4" />
+                    </motion.button>
+                    {/* Maximize Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        setIsImageMaximized(!isImageMaximized);
+                        if (isImageMinimized) setIsImageMinimized(false);
+                      }}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title={isImageMaximized ? "Restore" : "Maximize"}
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </motion.button>
+                    {/* Close Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleCloseImageModal}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                      title="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                </div>
 
-            {/* Navigation Arrows (if multiple images) */}
-            {imagePreviewItems.length > 1 && (
-              <>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    const prevIndex =
-                      selectedImageIndex !== null && selectedImageIndex > 0
-                        ? selectedImageIndex - 1
-                        : imagePreviewItems.length - 1;
-                    setSelectedImageIndex(prevIndex);
-                    setImageZoom(1);
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
-                  title="Previous Image"
-                >
-                  <ChevronRight className="w-5 h-5 rotate-180" />
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={() => {
-                    const nextIndex =
-                      selectedImageIndex !== null && selectedImageIndex < imagePreviewItems.length - 1
-                        ? selectedImageIndex + 1
-                        : 0;
-                    setSelectedImageIndex(nextIndex);
-                    setImageZoom(1);
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
-                  title="Next Image"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </motion.button>
-              </>
-            )}
-          </motion.div>
-        </motion.div>
+                {/* Image Container */}
+                <div className="w-full h-full flex items-center justify-center overflow-auto bg-gray-100 dark:bg-gray-900 p-4">
+                  <motion.img
+                    src={preview}
+                    alt={file.name}
+                    style={{
+                      transform: `scale(${imageZoom})`,
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      objectFit: 'contain',
+                    }}
+                    className="transition-transform duration-200"
+                    draggable={false}
+                  />
+                </div>
+
+                {/* Navigation Arrows (if multiple images) */}
+                {imagePreviewItems.length > 1 && (
+                  <>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        const prevIndex =
+                          selectedImageIndex !== null && selectedImageIndex > 0
+                            ? selectedImageIndex - 1
+                            : imagePreviewItems.length - 1;
+                        setSelectedImageIndex(prevIndex);
+                        setImageZoom(1);
+                      }}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
+                      title="Previous Image"
+                    >
+                      <ChevronRight className="w-5 h-5 rotate-180" />
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        const nextIndex =
+                          selectedImageIndex !== null && selectedImageIndex < imagePreviewItems.length - 1
+                            ? selectedImageIndex + 1
+                            : 0;
+                        setSelectedImageIndex(nextIndex);
+                        setImageZoom(1);
+                      }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 hover:bg-white/30 rounded-full text-white z-10 transition-colors"
+                      title="Next Image"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </motion.button>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
           );
         })()}
 
@@ -5324,11 +5308,10 @@ export default function Chat() {
             <div className="flex items-center">
               <button
                 onClick={() => setChatHistoryTab('all')}
-                className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-                  chatHistoryTab === 'all'
-                    ? 'text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className={`px-4 py-3 text-sm font-medium transition-colors relative ${chatHistoryTab === 'all'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
               >
                 All
                 {chatHistoryTab === 'all' && (
@@ -5337,11 +5320,10 @@ export default function Chat() {
               </button>
               <button
                 onClick={() => setChatHistoryTab('starred')}
-                className={`px-4 py-3 text-sm font-medium transition-colors relative ${
-                  chatHistoryTab === 'starred'
-                    ? 'text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                }`}
+                className={`px-4 py-3 text-sm font-medium transition-colors relative ${chatHistoryTab === 'starred'
+                  ? 'text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
               >
                 Starred
                 {chatHistoryTab === 'starred' && (
@@ -5409,11 +5391,10 @@ export default function Chat() {
                         key={chat.id}
                         whileHover={{ scale: 1.02 }}
                         onClick={() => handleChatHistoryItemClick(chat.id)}
-                        className={`group p-3 rounded-lg border transition-colors mb-2 ${
-                          conversationId === chat.id
-                            ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700'
-                            : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
-                        }`}
+                        className={`group p-3 rounded-lg border transition-colors mb-2 ${conversationId === chat.id
+                          ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700'
+                          : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer'
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -5435,11 +5416,10 @@ export default function Chat() {
                               className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
                             >
                               <Star
-                                className={`w-4 h-4 ${
-                                  chat.starred
-                                    ? 'fill-yellow-400 text-yellow-400'
-                                    : 'text-gray-400'
-                                }`}
+                                className={`w-4 h-4 ${chat.starred
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-400'
+                                  }`}
                               />
                             </motion.button>
                             <div className="relative">
@@ -5454,7 +5434,7 @@ export default function Chat() {
                               >
                                 <MoreVertical className="w-4 h-4 text-gray-400" />
                               </motion.button>
-                              
+
                               {/* Dropdown Menu */}
                               {openMenuId === chat.id && (
                                 <motion.div

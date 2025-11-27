@@ -230,11 +230,50 @@
         }
       },
 
-      async googleSignIn(token) {
-        // UI only - just return success
-        console.log('Google sign-in UI action (no logic)');
-        return { success: true, data: {} };
+      async googleSignIn(googleToken) {
+        try {
+          const baseUrl = await getApiBaseUrl();
+          const api = window.SiderExtensionAPI || {};
+          const url = api.buildUrl
+            ? await api.buildUrl(api.endpoints?.auth?.googleSignin || '/api/auth/google/signin')
+            : `${baseUrl}/api/auth/google/signin`;
+      
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'accept': 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              token: googleToken   // this matches your backend
+            })
+          });
+      
+          const data = await response.json();
+          console.log('Google signin response:', response.status, data);
+      
+          if (!response.ok) {
+            return {
+              success: false,
+              error: data.detail || data.message || 'Google sign in failed'
+            };
+          }
+      
+          if (data.code === 0 && data.data?.access_token) {
+            await this.saveTokens(data.data.access_token, data.data.refresh_token);
+            if (data.data.user) {
+              await this.saveUserInfo(data.data.user);
+            }
+            return { success: true, data: data.data };
+          }
+      
+          return { success: false, error: 'Invalid Google response format' };
+        } catch (err) {
+          console.error('Google Sign-In error:', err);
+          return { success: false, error: err.message };
+        }
       },
+      
 
       async refreshToken() {
         // UI only - just return success

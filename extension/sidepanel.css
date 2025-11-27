@@ -698,20 +698,11 @@ body {
   white-space: nowrap;
 }
 
-.sider-chat-controls-model-btn:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
-}
-
 .sider-chat-controls-model-btn svg {
   width: 12px;
   height: 12px;
   color: #6b7280;
   transition: transform 0.2s;
-}
-
-.sider-chat-controls-model-btn:hover svg {
-  transform: translateY(2px);
 }
 
 .sider-chat-controls-model-text {

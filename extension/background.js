@@ -21,6 +21,13 @@ chrome.action.onClicked.addListener(async (tab) => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "GOOGLE_OAUTH") {
+    console.log("Background: received GOOGLE_OAUTH request");
+    handleGoogleOAuth(sendResponse);
+    return true;
+  }
+
+  // 2) your existing handlers
   if (request.type === 'CHAT_REQUEST') {
     handleChatRequest(request, sendResponse);
     return true; // Indicates we will send a response asynchronously
@@ -347,6 +354,71 @@ async function getApiBaseUrl() {
     });
   });
 }
+
+async function fetchGoogleClientId() {
+  const baseUrl = await getApiBaseUrl();
+  const url = `${baseUrl}/api/auth/google/client-id`;
+
+  const res = await fetch(url);
+  const json = await res.json();
+
+  if (!res.ok || !json || json.code !== 0 || !json.data?.client_id) {
+    throw new Error("Failed to fetch Google OAuth client id");
+  }
+
+  return json.data.client_id;
+}
+
+async function handleGoogleOAuth(sendResponse) {
+  try {
+    // 1) Get Google Client ID from backend
+    const clientId = await fetchGoogleClientId();
+
+    // 2) Extension redirect URL
+    const redirectUri = chrome.identity.getRedirectURL("google");
+
+    // 3) Google OAuth URL
+    const authUrl =
+      "https://accounts.google.com/o/oauth2/v2/auth" +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      "&response_type=token" +
+      "&scope=" + encodeURIComponent("email profile") +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+
+    // 4) Open Google OAuth popup
+    chrome.identity.launchWebAuthFlow(
+      { url: authUrl, interactive: true },
+      (redirectedTo) => {
+        if (chrome.runtime.lastError) {
+          sendResponse({
+            success: false,
+            error: chrome.runtime.lastError.message || "Google OAuth failed"
+          });
+          return;
+        }
+
+        if (!redirectedTo) {
+          sendResponse({ success: false, error: "Empty redirect URL" });
+          return;
+        }
+
+        // 5) Extract Google access_token
+        const match = redirectedTo.match(/access_token=([^&]+)/);
+        if (!match) {
+          sendResponse({ success: false, error: "No access_token returned" });
+          return;
+        }
+
+        const googleToken = match[1];
+        sendResponse({ success: true, token: googleToken });
+      }
+    );
+  } catch (err) {
+    sendResponse({ success: false, error: err.message });
+  }
+}
+
+
 
 // Helper to get auth token from chrome.storage
 async function getAuthToken() {
